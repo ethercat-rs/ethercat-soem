@@ -11,5 +11,9 @@ edition = "2018"
 bindgen = "0.55"
 cmake = "0.1"
 
+[features]
+# See https://github.com/OpenEtherCATsociety/SOEM/issues/224#issuecomment-525872643
+issue-224-workaround = []
+
 [badges]
 maintenance = { status = "actively-developed" }
