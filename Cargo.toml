@@ -17,6 +17,10 @@ thiserror = "1"
 version = "0.0"
 path = "ethercat-soem-sys"
 
+[dev-dependencies]
+anyhow = "1"
+env_logger = "0.8"
+
 [features]
 # See https://github.com/OpenEtherCATsociety/SOEM/issues/224#issuecomment-525872643
 issue-224-workaround = ["ethercat-soem-sys/issue-224-workaround"]
