@@ -5,23 +5,18 @@ use std::{
     process::{Command, Stdio},
 };
 
-fn main() {
-    let path = env::var("SOEM_PATH").unwrap_or("SOEM".to_string());
-    let dst = cmake::Config::new(&path).build();
+const ISSUE_224_PATCH: &[u8] = include_bytes!("issue-224.patch");
 
-    if env::var("CARGO_FEATURE_ISSUE_224_WORKAROUND").is_ok() {
-        let patch = include_bytes!("issue-224.patch");
-        let mut patch_stdin = Command::new("patch")
-            .arg("-p0")
-            .stdin(Stdio::piped())
-            .current_dir(path)
-            .spawn()
-            .expect("Could not spawn 'patch' command")
-            .stdin
-            .unwrap();
-        let mut writer = BufWriter::new(&mut patch_stdin);
-        writer.write_all(patch).expect("Could not patch sources");
+fn main() {
+    let soem_dir = env::var("SOEM_PATH").unwrap_or("SOEM".to_string());
+
+    let issue_224_workaround = env::var("CARGO_FEATURE_ISSUE_224_WORKAROUND").is_ok();
+
+    if issue_224_workaround {
+        patch_files(&soem_dir);
     }
+
+    let dst = cmake::Config::new(&soem_dir).build();
 
     println!("cargo:rustc-link-search=native={}/lib", dst.display());
     println!("cargo:rustc-link-lib=static=soem");
@@ -56,4 +51,39 @@ fn main() {
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
+
+    if issue_224_workaround {
+        undo_patch_files(&soem_dir);
+    }
+}
+
+fn patch_files(soem_dir: &str) {
+    let mut patch_stdin = Command::new("patch")
+        .arg("-p0")
+        .stdin(Stdio::piped())
+        .current_dir(soem_dir)
+        .spawn()
+        .expect("Could not spawn 'patch' command")
+        .stdin
+        .unwrap();
+    let mut writer = BufWriter::new(&mut patch_stdin);
+    writer
+        .write_all(ISSUE_224_PATCH)
+        .expect("Could not patch sources");
+}
+
+fn undo_patch_files(soem_dir: &str) {
+    let mut patch_stdin = Command::new("patch")
+        .arg("-R")
+        .arg("-p0")
+        .stdin(Stdio::piped())
+        .current_dir(soem_dir)
+        .spawn()
+        .expect("Could not spawn 'patch' command")
+        .stdin
+        .unwrap();
+    let mut writer = BufWriter::new(&mut patch_stdin);
+    writer
+        .write_all(ISSUE_224_PATCH)
+        .expect("Could not undo patching sources");
 }
