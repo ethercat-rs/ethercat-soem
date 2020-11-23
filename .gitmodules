@@ -1,0 +1,3 @@
+[submodule "ethercat-soem-sys/SOEM"]
+	path = ethercat-soem-sys/SOEM
+	url = https://github.com/OpenEtherCATsociety/SOEM
