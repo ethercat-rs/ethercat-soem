@@ -14,7 +14,7 @@ num-traits = "0.2"
 thiserror = "1"
 
 [dependencies.ethercat-soem-sys]
-version = "0.0"
+version = "0.1"
 path = "ethercat-soem-sys"
 
 [dev-dependencies]
