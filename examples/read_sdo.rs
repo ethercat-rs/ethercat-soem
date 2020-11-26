@@ -1,7 +1,10 @@
 use anyhow::Result;
 use ethercat_soem as soem;
 use ethercat_types as ec;
-use std::{thread, time::Duration};
+use std::{
+    thread,
+    time::{Duration, Instant},
+};
 
 pub fn main() -> Result<()> {
     env_logger::init();
@@ -15,37 +18,72 @@ pub fn main() -> Result<()> {
 }
 
 fn read_sdo(ifname: &str) -> Result<()> {
-    let mut master = soem::Master::new(ifname)?;
+    let mut master = soem::Master::try_new(ifname)?;
     master.auto_config()?;
+
+    for s in master.slaves() {
+        log::info!("Found {:#?}", s);
+    }
 
     log::debug!("Request operational state for all slaves");
     master.request_states(ec::AlState::Op)?;
 
     let cycle_time = Duration::from_micros(5_000);
-    let sdo_complete = false;
-    let sdo_read_timeout = Duration::from_micros(700_000);
-
     let mut read_times = vec![];
 
-    for _ in 0..=1000 {
-        master.send_processdata()?;
-        master.recv_processdata()?;
-        let sdo_read_start = std::time::Instant::now();
+    // Dirty hack to use the same underlying SOEM context
+    // within an other thread.
+    let master_ptr = master.ptr();
+    let ptr_addr: u64 = unsafe { std::mem::transmute(master_ptr) };
 
-        let data = master.read_sdo::<u32>(
-            ec::SlavePos::from(0),
-            ec::SdoIdx {
-                idx: ec::Idx::from(0x1018),
-                sub_idx: ec::SubIdx::from(0x01),
-            },
-            sdo_complete,
-            sdo_read_timeout,
-        )?;
-        let dt = sdo_read_start.elapsed();
-        println!("SDO read: {}ms, data: {}", dt.as_millis(), data);
-        read_times.push(dt);
-        if let Some(dt) = cycle_time.checked_sub(dt) {
-            thread::sleep(dt);
+    thread::spawn(move || {
+        let mut rt_master = unsafe {
+            let ptr = std::mem::transmute(ptr_addr);
+            soem::Master::from_ptr(ptr)
+        };
+        loop {
+            let cycle_start = Instant::now();
+            rt_master.send_processdata().unwrap();
+            rt_master.recv_processdata().unwrap();
+            for s in rt_master.slaves() {
+                log::debug!("Inputs:{:?}", s.inputs());
+                log::debug!("Outputs:{:?}", s.outputs());
+            }
+            let dt = cycle_start.elapsed();
+            match cycle_time.checked_sub(dt) {
+                Some(x) => {
+                    log::debug!("Send & Receive took {}µs", x.as_micros());
+                    thread::sleep(x);
+                }
+                None => {
+                    log::warn!("Send & Receive took {}µs", dt.as_micros());
+                }
+            }
+        }
+    });
+
+    let sdo_idxs = [4120, 4337, 32916];
+    let sdo_complete = true;
+    let sdo_read_timeout = Duration::from_millis(5_000);
+    let mut sdo_buff = [0; 1024];
+
+    for _ in 0..=1000 {
+        for idx in &sdo_idxs {
+            let sdo_read_start = std::time::Instant::now();
+
+            let data = master.read_sdo(
+                ec::SlavePos::from(0),
+                ec::SdoIdx {
+                    idx: ec::Idx::from(*idx),
+                    sub_idx: ec::SubIdx::from(0x01),
+                },
+                sdo_complete,
+                &mut sdo_buff,
+                sdo_read_timeout,
+            )?;
+            let dt = sdo_read_start.elapsed();
+            log::debug!("SDO read: {}ms, data: {:?}", dt.as_millis(), data);
+            read_times.push(dt);
         }
     }
 

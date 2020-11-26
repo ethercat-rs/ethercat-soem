@@ -15,7 +15,7 @@ pub fn main() -> Result<()> {
 }
 
 fn simple(ifname: &str) -> Result<()> {
-    let mut master = soem::Master::new(ifname)?;
+    let mut master = soem::Master::try_new(ifname)?;
     master.auto_config()?;
 
     let list = master.read_od_list(ec::SlavePos::from(0))?;
