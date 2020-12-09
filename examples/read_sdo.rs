@@ -63,24 +63,25 @@ fn read_sdo(ifname: &str) -> Result<()> {
     });
 
     let sdo_idxs = [4120, 4337, 32916];
-    let sdo_complete = true;
-    let sdo_read_timeout = Duration::from_millis(5_000);
-    let mut sdo_buff = [0; 1024];
+
+    let slave_pos = ec::SlavePos::from(0);
 
     for _ in 0..=1000 {
         for idx in &sdo_idxs {
             let sdo_read_start = std::time::Instant::now();
 
-            let data = master.read_sdo(
-                ec::SlavePos::from(0),
+            let data = master.read_sdo_entry(
+                slave_pos,
                 ec::SdoIdx {
                     idx: ec::Idx::from(*idx),
                     sub_idx: ec::SubIdx::from(0x01),
                 },
-                sdo_complete,
-                &mut sdo_buff,
-                sdo_read_timeout,
             )?;
+            let dt = sdo_read_start.elapsed();
+            log::debug!("SDO read: {}ms, data: {:?}", dt.as_millis(), data);
+            read_times.push(dt);
+
+            let data = master.read_sdo_complete(ec::SlavePos::from(0), ec::Idx::from(*idx))?;
             let dt = sdo_read_start.elapsed();
             log::debug!("SDO read: {}ms, data: {:?}", dt.as_millis(), data);
             read_times.push(dt);

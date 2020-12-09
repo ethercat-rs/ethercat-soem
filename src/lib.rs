@@ -1,6 +1,7 @@
 use ethercat_types as ec;
 use num_traits::cast::FromPrimitive;
 use std::{
+    collections::HashMap,
     ffi::{CStr, CString},
     mem,
     os::raw::{c_int, c_void},
@@ -10,6 +11,7 @@ use std::{
 mod context;
 mod error;
 mod slave;
+mod util;
 
 use context::sys;
 use slave::Slave;
@@ -17,14 +19,22 @@ use slave::Slave;
 pub use error::Error;
 
 const EC_TIMEOUTRET: i32 = 2_000;
+const DEFAULT_SDO_TIMEOUT: Duration = Duration::from_millis(5_000);
 
 type Result<T> = std::result::Result<T, Error>;
+type SdoInfo = Vec<(ec::SdoInfo, Vec<Option<ec::SdoEntryInfo>>)>;
 
-pub struct Master(Box<context::Ctx>);
+pub struct Master {
+    ctx: Box<context::Ctx>,
+    sdo_info: HashMap<ec::SlavePos, SdoInfo>,
+}
 
 impl Master {
     pub fn try_new<S: Into<String>>(iface: S) -> Result<Self> {
-        let mut master = Self(Box::new(context::Ctx::default()));
+        let mut master = Self {
+            ctx: Box::new(context::Ctx::default()),
+            sdo_info: HashMap::new(),
+        };
         master.init(iface.into())?;
         Ok(master)
     }
@@ -32,14 +42,17 @@ impl Master {
     #[doc(hidden)]
     /// Don't use this!
     pub fn ptr(&mut self) -> *mut context::Ctx {
-        let reference: &mut context::Ctx = &mut *self.0;
+        let reference: &mut context::Ctx = &mut *self.ctx;
         reference as *mut context::Ctx
     }
 
     #[doc(hidden)]
     /// Don't use this!
     pub unsafe fn from_ptr(ctx_ptr: *mut context::Ctx) -> Self {
-        Master(Box::from_raw(ctx_ptr))
+        Master {
+            ctx: Box::from_raw(ctx_ptr),
+            sdo_info: HashMap::new(),
+        }
     }
 
     fn init(&mut self, iface: String) -> Result<()> {
@@ -54,7 +67,7 @@ impl Master {
     }
 
     fn ctx(&mut self) -> &mut sys::ecx_context {
-        self.0.ecx()
+        self.ctx.ecx()
     }
 
     pub fn auto_config(&mut self) -> Result<()> {
@@ -74,7 +87,7 @@ impl Master {
         let io_map_size = unsafe {
             sys::ecx_config_map_group(
                 self.ctx(),
-                self.0.io_map.as_mut_ptr() as *mut std::ffi::c_void,
+                self.ctx.io_map.as_mut_ptr() as *mut std::ffi::c_void,
                 group,
             )
         };
@@ -87,13 +100,18 @@ impl Master {
             log::debug!("{:?}", self.errors());
             return Err(Error::CfgDc);
         }
+        for i in 0..self.slave_count() {
+            let pos = ec::SlavePos::from(i as u16);
+            let info = self._sdo_info(pos)?;
+            self.sdo_info.insert(pos, info);
+        }
         Ok(())
     }
 
     pub fn request_states(&mut self, state: ec::AlState) -> Result<()> {
         log::debug!("wait for all slaves to reach {:?} state", state);
         for i in 0..self.slave_count() {
-            self.0.slave_list[i].set_state(state);
+            self.ctx.slave_list[i].set_state(state);
             let wkc = unsafe { sys::ecx_writestate(self.ctx(), i as u16) };
             if wkc <= 0 {
                 log::debug!("{:?}", self.errors());
@@ -120,7 +138,7 @@ impl Master {
 
     pub fn slaves(&mut self) -> &mut [Slave] {
         let cnt = self.slave_count();
-        &mut self.0.slave_list[1..=cnt]
+        &mut self.ctx.slave_list[1..=cnt]
     }
 
     pub fn states(&mut self) -> Result<Vec<ec::AlState>> {
@@ -138,7 +156,7 @@ impl Master {
     }
 
     fn slave_state(&self, slave: usize) -> Result<ec::AlState> {
-        self.0.slave_list[slave].state()
+        self.ctx.slave_list[slave].state()
     }
 
     pub fn send_processdata(&mut self) -> Result<()> {
@@ -160,32 +178,32 @@ impl Master {
     }
 
     pub fn group_outputs_wkc(&mut self, i: usize) -> Result<usize> {
-        if i >= self.0.group_list.len() || i >= self.max_group() {
+        if i >= self.ctx.group_list.len() || i >= self.max_group() {
             if self.is_err() {
                 log::debug!("{:?}", self.errors());
             }
             return Err(Error::GroupId);
         }
-        Ok(self.0.group_list[i].outputsWKC as usize)
+        Ok(self.ctx.group_list[i].outputsWKC as usize)
     }
 
     pub fn group_inputs_wkc(&mut self, i: usize) -> Result<usize> {
-        if i >= self.0.group_list.len() || i >= self.max_group() {
+        if i >= self.ctx.group_list.len() || i >= self.max_group() {
             log::debug!("{:?}", self.errors());
             return Err(Error::GroupId);
         }
-        Ok(self.0.group_list[i].inputsWKC as usize)
+        Ok(self.ctx.group_list[i].inputsWKC as usize)
     }
     pub fn slave_count(&self) -> usize {
-        self.0.slave_count() as usize
+        self.ctx.slave_count() as usize
     }
 
     pub fn max_group(&self) -> usize {
-        self.0.max_group()
+        self.ctx.max_group()
     }
 
     pub fn dc_time(&self) -> i64 {
-        *self.0.dc_time
+        *self.ctx.dc_time
     }
 
     fn read_od_desc(&mut self, item: u16, od_list: &mut sys::ec_ODlistt) -> Result<ec::SdoInfo> {
@@ -226,10 +244,16 @@ impl Master {
         Ok(oe_list)
     }
 
-    pub fn read_od_list(
+    pub fn sdo_info(
+        &mut self,
+    ) -> &HashMap<ec::SlavePos, Vec<(ec::SdoInfo, Vec<Option<ec::SdoEntryInfo>>)>> {
+        &self.sdo_info
+    }
+
+    fn _sdo_info(
         &mut self,
         slave: ec::SlavePos,
-    ) -> Result<Vec<(ec::SdoInfo, Vec<ec::SdoEntryInfo>)>> {
+    ) -> Result<Vec<(ec::SdoInfo, Vec<Option<ec::SdoEntryInfo>>)>> {
         let mut od_list: sys::ec_ODlistt = unsafe { mem::zeroed() };
         let res = unsafe { sys::ecx_readODlist(self.ctx(), u16::from(slave) + 1, &mut od_list) };
 
@@ -261,9 +285,10 @@ impl Master {
                         access,
                         description,
                     };
-                    entries.push(entry_info);
+                    entries.push(Some(entry_info));
                 } else {
                     log::debug!("Invalid SDO entry: {:?} item {}", sdo_info.pos, j);
+                    entries.push(None);
                 }
             }
             sdos.push((sdo_info, entries));
@@ -309,6 +334,105 @@ impl Master {
         Ok(&mut target[..size as usize])
     }
 
+    pub fn read_sdo_entry(&mut self, slave: ec::SlavePos, idx: ec::SdoIdx) -> Result<ec::Value> {
+        let entry_info = self
+            .sdo_info
+            .get(&slave)
+            .and_then(|info| info.iter().find(|(info, _)| info.idx == idx.idx))
+            .and_then(|(_, entries)| entries.iter().nth(u8::from(idx.sub_idx) as usize))
+            .and_then(Option::as_ref)
+            .ok_or_else(|| Error::SubIdxNotFound(slave, idx))?;
+
+        let dt: ec::DataType = entry_info.data_type;
+
+        const BUFF_SIZE: usize = 2048; // TODO: what's the correct size?
+        let mut target = [0_u8; BUFF_SIZE];
+        let mut size = mem::size_of_val(&target) as c_int;
+        let index = u16::from(idx.idx);
+        let subindex = u8::from(idx.sub_idx);
+        let timeout = DEFAULT_SDO_TIMEOUT.as_micros() as i32; //TODO: check overflow
+
+        let wkc = unsafe {
+            sys::ecx_SDOread(
+                self.ctx(),
+                u16::from(slave) + 1,
+                index,
+                subindex,
+                0,
+                &mut size,
+                target.as_mut_ptr() as *mut c_void,
+                timeout,
+            )
+        };
+        if wkc <= 0 {
+            let errs = self.errors();
+            log::debug!("{:?}", errs);
+            return Err(Error::ReadSdo(slave, idx));
+        }
+        let raw_value = &target[..size as usize];
+        debug_assert!(!raw_value.is_empty());
+        Ok(util::value_from_slice(dt, raw_value)?)
+    }
+
+    pub fn read_sdo_complete(
+        &mut self,
+        slave: ec::SlavePos,
+        idx: ec::Idx,
+    ) -> Result<Vec<Option<ec::Value>>> {
+        const BUFF_SIZE: usize = 2048; // TODO: what's the correct size?
+        let mut target = [0_u8; BUFF_SIZE];
+        let mut size = mem::size_of_val(&target) as c_int;
+        let index = u16::from(idx);
+        let timeout = DEFAULT_SDO_TIMEOUT.as_micros() as i32; //TODO: check overflow
+
+        let wkc = unsafe {
+            sys::ecx_SDOread(
+                self.ctx(),
+                u16::from(slave) + 1,
+                index,
+                0,
+                1,
+                &mut size,
+                target.as_mut_ptr() as *mut c_void,
+                timeout,
+            )
+        };
+        if wkc <= 0 {
+            let errs = self.errors();
+            log::debug!("{:?}", errs);
+            return Err(Error::ReadSdoComplete(slave, idx));
+        }
+
+        let info = self
+            .sdo_info
+            .get(&slave)
+            .and_then(|info| info.iter().find(|(info, _)| info.idx == idx))
+            .map(|(_, entries)| entries)
+            .ok_or_else(|| Error::IdxNotFound(slave, idx))?;
+
+        let byte_pos = 0;
+        let mut values = vec![];
+
+        for e in info {
+            match e {
+                Some(e) => {
+                    let byte_count = if e.bit_len % 8 != 0 {
+                        (e.bit_len / 8) + 1
+                    } else {
+                        e.bit_len / 8
+                    } as usize;
+                    let raw_value = &target[byte_pos..byte_count];
+                    let val = util::value_from_slice(e.data_type, raw_value)?;
+                    values.push(Some(val));
+                }
+                None => {
+                    values.push(None);
+                }
+            }
+        }
+        Ok(values)
+    }
+
     pub fn write_sdo(
         &mut self,
         slave: ec::SlavePos,
@@ -344,11 +468,11 @@ impl Master {
     }
 
     fn is_err(&mut self) -> bool {
-        self.0.is_err()
+        self.ctx.is_err()
     }
 
     fn errors(&mut self) -> Vec<context::EcError> {
-        self.0.errors()
+        self.ctx.errors()
     }
 }
 

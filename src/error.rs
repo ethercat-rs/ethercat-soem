@@ -35,8 +35,20 @@ pub enum Error {
     ReadOeList(ec::SdoPos),
     #[error("Could not read {1:?} of {0:?}")]
     ReadSdo(ec::SlavePos, ec::SdoIdx),
+    #[error("Could not read {1:?} of {0:?}")]
+    ReadSdoComplete(ec::SlavePos, ec::Idx),
+    #[error("Index {1:?} not found at {0:?}")]
+    IdxNotFound(ec::SlavePos, ec::Idx),
+    #[error("Subindex {1:?} not found at {0:?}")]
+    SubIdxNotFound(ec::SlavePos, ec::SdoIdx),
     #[error("Could not write {1:?} of {0:?}")]
     WriteSdo(ec::SlavePos, ec::SdoIdx),
+    #[error("Data type ({0:?}) is not supported yet")]
+    UnsuportedDataType(ec::DataType),
+    #[error("Cannot read value from empty buffer")]
+    ValueFromEmptyBuf,
+    #[error("Cannot convert raw data to EtherCAT value")]
+    ValueConversion(#[from] std::array::TryFromSliceError),
     #[error("No frame received")]
     NoFrame,
     #[error("Unkown frame received")]
