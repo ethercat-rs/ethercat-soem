@@ -1,0 +1,18 @@
+[package]
+name = "ethercat-soem-ctx"
+version = "0.1.0"
+description = "Wrapper for the SOEM open-source EtherCAT master context"
+authors = ["Markus Kohlhase <markus.kohlhase@slowtec.de>"]
+license = "GPL-2.0-only"
+edition = "2018"
+
+[dependencies]
+thiserror = "1"
+
+[dependencies.ethercat-soem-sys]
+version = "0.1"
+path = "../ethercat-soem-sys"
+
+[features]
+# See https://github.com/OpenEtherCATsociety/SOEM/issues/224#issuecomment-525872643
+issue-224-workaround = ["ethercat-soem-sys/issue-224-workaround"]

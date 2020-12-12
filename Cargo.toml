@@ -8,14 +8,14 @@ license = "GPL-2.0-only"
 edition = "2018"
 
 [dependencies]
-ethercat-types = "0.3.1"
+ethercat-types = "0.3.2"
 log = "0.4"
 num-traits = "0.2"
 thiserror = "1"
 
-[dependencies.ethercat-soem-sys]
+[dependencies.ethercat-soem-ctx]
 version = "0.1"
-path = "ethercat-soem-sys"
+path = "ethercat-soem-ctx"
 
 [dev-dependencies]
 anyhow = "1"
@@ -23,4 +23,4 @@ env_logger = "0.8"
 
 [features]
 # See https://github.com/OpenEtherCATsociety/SOEM/issues/224#issuecomment-525872643
-issue-224-workaround = ["ethercat-soem-sys/issue-224-workaround"]
+issue-224-workaround = ["ethercat-soem-ctx/issue-224-workaround"]
