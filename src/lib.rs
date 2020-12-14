@@ -4,22 +4,24 @@ extern crate num_derive;
 use ethercat_soem_ctx as ctx;
 use ethercat_types as ec;
 use num_traits::cast::FromPrimitive;
-use std::{convert::TryFrom, ffi::CString, time::Duration};
+use std::{collections::HashMap, convert::TryFrom, ffi::CString, time::Duration};
 
 mod al_status;
 mod error;
+mod util;
 
 pub use self::{al_status::*, error::Error};
 
 const EC_TIMEOUTRET: u64 = 2_000;
 
 type Result<T> = std::result::Result<T, Error>;
+type SdoInfo = Vec<(ec::SdoInfo, Vec<Option<ec::SdoEntryInfo>>)>;
 
-pub struct Master(Box<ctx::Ctx>);
+pub struct Master(Box<ctx::Ctx>, HashMap<ec::SlavePos, SdoInfo>);
 
 impl Master {
     pub fn try_new<S: Into<String>>(iface: S) -> Result<Self> {
-        let mut master = Self(Box::new(ctx::Ctx::default()));
+        let mut master = Self(Box::new(ctx::Ctx::default()), HashMap::new());
         master.init(iface.into())?;
         Ok(master)
     }
@@ -34,7 +36,7 @@ impl Master {
     #[doc(hidden)]
     /// Don't use this!
     pub unsafe fn from_ptr(ctx_ptr: *mut ctx::Ctx) -> Self {
-        Master(Box::from_raw(ctx_ptr))
+        Master(Box::from_raw(ctx_ptr), HashMap::new())
     }
 
     fn init(&mut self, iface: String) -> Result<()> {
@@ -60,7 +62,8 @@ impl Master {
                 _ => Error::NoSlaves,
             });
         }
-        log::debug!("{} slaves found and configured", self.0.slave_count());
+        let slave_count = self.0.slave_count();
+        log::debug!("{} slaves found and configured", slave_count);
         let group = 0;
         let io_map_size = self.0.config_map_group(group);
         if io_map_size <= 0 {
@@ -71,6 +74,11 @@ impl Master {
         if res == 0 {
             log::debug!("{:?}", self.ctx_errors());
             return Err(Error::CfgDc);
+        }
+        for i in 0..slave_count {
+            let pos = ec::SlavePos::from(i as u16);
+            let sdo_info = self.read_od_list(pos)?;
+            self.1.insert(pos, sdo_info);
         }
         Ok(())
     }
@@ -90,10 +98,8 @@ impl Master {
         Ok(())
     }
 
-    pub fn check_states(&mut self, state: ec::AlState) -> Result<()> {
-        let res = self
-            .0
-            .state_check(0, u8::from(state) as u16, Duration::from_micros(50_000));
+    pub fn check_states(&mut self, state: ec::AlState, timeout: Duration) -> Result<()> {
+        let res = self.0.state_check(0, u8::from(state) as u16, timeout);
         if res == 0 {
             log::debug!("{:?}", self.ctx_errors());
             log::warn!("Could not check state {:?} for slaves", state);
@@ -210,10 +216,7 @@ impl Master {
         Ok(oe_list)
     }
 
-    pub fn read_od_list(
-        &mut self,
-        slave: ec::SlavePos,
-    ) -> Result<Vec<(ec::SdoInfo, Vec<ec::SdoEntryInfo>)>> {
+    pub fn read_od_list(&mut self, slave: ec::SlavePos) -> Result<SdoInfo> {
         let mut od_list = ctx::OdList::default();
         let res = self.0.read_od_list(u16::from(slave) + 1, &mut od_list);
 
@@ -229,29 +232,33 @@ impl Master {
         for i in 0..od_list.entries() {
             let sdo_info = self.read_od_desc(i as u16, &mut od_list)?;
             let oe_list = self.read_oe_list(i as u16, &mut od_list)?;
-
             let mut entries = vec![];
-
             for j in 0..=u8::from(sdo_info.max_sub_idx) as usize {
-                if oe_list.data_types()[j] > 0 && oe_list.bit_lengths()[j] > 0 {
-                    let dt = oe_list.data_types()[j];
-                    let data_type = ec::DataType::from_u16(dt).unwrap_or_else(|| {
-                        log::warn!("Unknown DataType {}: use RAW as fallback", dt);
-                        ec::DataType::Raw
+                let dt = oe_list.data_types()[j];
+                let len = oe_list.bit_lengths()[j];
+                let bit_len = if len == 0 { None } else { Some(len) };
+                let info = ec::DataType::from_u16(dt)
+                    .zip(bit_len)
+                    .map(|(data_type, bit_len)| {
+                        let access = access_from_u16(oe_list.object_access()[j]);
+                        let description = oe_list.names()[j].clone();
+                        ec::SdoEntryInfo {
+                            data_type,
+                            bit_len,
+                            access,
+                            description,
+                        }
                     });
-                    let bit_len = oe_list.bit_lengths()[j];
-                    let access = access_from_u16(oe_list.object_access()[j]);
-                    let description = oe_list.names()[j].clone();
-                    let entry_info = ec::SdoEntryInfo {
-                        data_type,
-                        bit_len,
-                        access,
-                        description,
-                    };
-                    entries.push(entry_info);
-                } else {
-                    log::debug!("Invalid SDO entry: {:?} item {}", sdo_info.pos, j);
+                if info.is_none() {
+                    log::warn!(
+                        "Invalid entry at {:?} index {}: Unknown data type ({}) with bit length {}",
+                        sdo_info.pos,
+                        j,
+                        dt,
+                        len
+                    );
                 }
+                entries.push(info);
             }
             sdos.push((sdo_info, entries));
         }
@@ -268,7 +275,6 @@ impl Master {
     ) -> Result<&'t mut [u8]> {
         let index = u16::from(idx.idx);
         let subindex = u8::from(idx.sub_idx);
-
         let (wkc, slice) = self.0.sdo_read(
             u16::from(slave) + 1,
             index,
@@ -288,6 +294,85 @@ impl Master {
             return Err(Error::ReadSdo(slave, idx));
         }
         Ok(slice)
+    }
+
+    pub fn read_sdo_entry(
+        &mut self,
+        slave: ec::SlavePos,
+        idx: ec::SdoIdx,
+        timeout: Duration,
+    ) -> Result<ec::Value> {
+        let info = self
+            .1
+            .get(&slave)
+            .and_then(|info| info.iter().find(|(info, _)| info.idx == idx.idx))
+            .and_then(|(_, entries)| entries.get(u8::from(idx.sub_idx) as usize))
+            .and_then(Option::as_ref)
+            .ok_or(Error::SubIdxNotFound(slave, idx))?;
+        let dt = info.data_type;
+        let len = info.bit_len as usize;
+        let byte_count = if len % 8 == 0 { len / 8 } else { (len / 8) + 1 };
+        let mut target = vec![0; byte_count];
+        let raw_value = self.read_sdo(slave, idx, false, &mut target, timeout)?;
+        debug_assert!(!raw_value.is_empty());
+        Ok(util::value_from_slice(dt, raw_value)?)
+    }
+
+    pub fn read_sdo_complete(
+        &mut self,
+        slave: ec::SlavePos,
+        idx: ec::Idx,
+        timeout: Duration,
+    ) -> Result<Vec<Option<ec::Value>>> {
+        let entries = self
+            .1
+            .get(&slave)
+            .and_then(|info| info.iter().find(|(info, _)| info.idx == idx))
+            .map(|(_, entries)| entries)
+            .ok_or(Error::IdxNotFound(slave, idx))?;
+        let entries: Vec<Option<(usize, ec::DataType)>> = entries
+            .iter()
+            .map(|e| {
+                e.as_ref().map(|e| {
+                    let len = e.bit_len as usize;
+                    let byte_count = if len % 8 == 0 { len / 8 } else { (len / 8) + 1 };
+                    (byte_count, e.data_type)
+                })
+            })
+            .collect();
+        let max_byte_count: usize = entries
+            .iter()
+            .filter_map(Option::as_ref)
+            .map(|(cnt, _)| *cnt)
+            .max()
+            .unwrap_or(0);
+        let buff_size = max_byte_count * entries.len();
+        let mut target = vec![0; buff_size];
+        let raw = self.read_sdo(
+            slave,
+            ec::SdoIdx {
+                idx,
+                sub_idx: ec::SubIdx::from(0),
+            },
+            true,
+            &mut target,
+            timeout,
+        )?;
+        let mut byte_pos = 0;
+        let mut values = vec![];
+        for e in entries {
+            let res = match e {
+                Some((cnt, data_type)) => {
+                    let raw_value = &raw[byte_pos..byte_pos + cnt];
+                    let val = util::value_from_slice(data_type, raw_value)?;
+                    byte_pos += cnt;
+                    Some(val)
+                }
+                None => None,
+            };
+            values.push(res);
+        }
+        Ok(values)
     }
 
     pub fn write_sdo(

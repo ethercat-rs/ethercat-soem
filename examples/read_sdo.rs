@@ -27,6 +27,7 @@ fn read_sdo(ifname: &str) -> Result<()> {
 
     log::debug!("Request operational state for all slaves");
     master.request_states(ec::AlState::Op)?;
+    master.check_states(ec::AlState::Op, Duration::from_millis(500))?;
 
     let cycle_time = Duration::from_micros(5_000);
     let mut read_times = vec![];
@@ -50,6 +51,7 @@ fn read_sdo(ifname: &str) -> Result<()> {
                 log::debug!("Outputs:{:?}", s.outputs());
             }
             let dt = cycle_start.elapsed();
+            log::debug!("Slave states: {:?}", rt_master.states());
             match cycle_time.checked_sub(dt) {
                 Some(x) => {
                     log::debug!("Send & Receive took {}µs", x.as_micros());
@@ -63,22 +65,15 @@ fn read_sdo(ifname: &str) -> Result<()> {
     });
 
     let sdo_idxs = [4120, 4337, 32916];
-    let sdo_complete = true;
     let sdo_read_timeout = Duration::from_millis(5_000);
-    let mut sdo_buff = [0; 1024];
 
     for _ in 0..=1000 {
         for idx in &sdo_idxs {
             let sdo_read_start = std::time::Instant::now();
 
-            let data = master.read_sdo(
+            let data = master.read_sdo_complete(
                 ec::SlavePos::from(0),
-                ec::SdoIdx {
-                    idx: ec::Idx::from(*idx),
-                    sub_idx: ec::SubIdx::from(0x01),
-                },
-                sdo_complete,
-                &mut sdo_buff,
+                ec::Idx::from(*idx),
                 sdo_read_timeout,
             )?;
             let dt = sdo_read_start.elapsed();

@@ -22,7 +22,7 @@ fn simple(ifname: &str) -> Result<()> {
     println!("{:#?}", list);
 
     log::debug!("wait for all slaves to reach SAFE_OP state");
-    master.check_states(ec::AlState::SafeOp)?;
+    master.check_states(ec::AlState::SafeOp, Duration::from_millis(5))?;
 
     let expected_wkc = master.group_outputs_wkc(0)? * 2 + master.group_inputs_wkc(0)?;
     log::debug!("Calculated workcounter {}", expected_wkc);
@@ -35,7 +35,7 @@ fn simple(ifname: &str) -> Result<()> {
     for _ in 0..200 {
         master.send_processdata()?;
         master.recv_processdata()?;
-        master.check_states(ec::AlState::Op)?;
+        master.check_states(ec::AlState::Op, Duration::from_millis(5))?;
         if master.states()?.iter().all(|s| *s == ec::AlState::Op) {
             log::info!("Operational state reached for all slaves");
             break;
