@@ -1,3 +1,4 @@
+use crate::AlStatus;
 use ethercat_types as ec;
 use thiserror::Error;
 
@@ -23,8 +24,8 @@ pub enum Error {
     SendProcessData,
     #[error("Could not receive process data")]
     RecvProcessData,
-    #[error("Invalid AL state")]
-    AlState,
+    #[error("Invalid AL state: {0:?}")]
+    AlState(AlStatus),
     #[error("Invalid group ID")]
     GroupId,
     #[error("Could not read OD list of {0:?}")]

@@ -1,11 +1,15 @@
+#[macro_use]
+extern crate num_derive;
+
 use ethercat_soem_ctx as ctx;
 use ethercat_types as ec;
 use num_traits::cast::FromPrimitive;
 use std::{convert::TryFrom, ffi::CString, time::Duration};
 
+mod al_status;
 mod error;
 
-pub use error::Error;
+pub use self::{al_status::*, error::Error};
 
 const EC_TIMEOUTRET: u64 = 2_000;
 
@@ -109,7 +113,6 @@ impl Master {
             log::debug!("{:?}", self.ctx_errors());
             return Err(Error::ReadStates);
         }
-        // TODO: check 'ALstatuscode'
         let states = (1..=self.0.slave_count())
             .into_iter()
             .map(|i| self.slave_state(i))
@@ -118,7 +121,10 @@ impl Master {
     }
 
     fn slave_state(&self, slave: usize) -> Result<ec::AlState> {
-        ec::AlState::try_from(self.0.slaves()[slave].state() as u8).map_err(|_| Error::AlState)
+        let s = &self.0.slaves()[slave];
+        let state = s.state();
+        let status_code = s.al_status_code();
+        ec::AlState::try_from(state as u8).map_err(|_| Error::AlState(AlStatus::from(status_code)))
     }
 
     pub fn send_processdata(&mut self) -> Result<()> {
