@@ -39,6 +39,12 @@ impl Master {
         Master(Box::from_raw(ctx_ptr), HashMap::new())
     }
 
+    #[doc(hidden)]
+    /// Don't use this!
+    pub fn sdo_info_cache(&self) -> &HashMap<ec::SlavePos, SdoInfo> {
+        &self.1
+    }
+
     fn init(&mut self, iface: String) -> Result<()> {
         log::debug!("Initialise SOEM stack: bind socket to {}", iface);
         let iface = CString::new(iface).map_err(|_| Error::Iface)?;
