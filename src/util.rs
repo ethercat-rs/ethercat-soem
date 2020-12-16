@@ -69,3 +69,38 @@ pub fn value_from_slice(dt: DataType, raw: &[u8]) -> Result<Value> {
     };
     Ok(val)
 }
+
+pub fn value_to_bytes(v: Value) -> Result<Vec<u8>> {
+    use Value as V;
+
+    let bytes = match v {
+        V::Bool(b) => {
+            if b {
+                vec![1]
+            } else {
+                vec![0]
+            }
+        }
+        V::Byte(v) => vec![v],
+
+        V::I8(v) => v.to_be_bytes().to_vec(),
+        V::I16(v) => v.to_be_bytes().to_vec(),
+        V::I32(v) => v.to_be_bytes().to_vec(),
+        V::I64(v) => v.to_be_bytes().to_vec(),
+
+        V::U8(v) => v.to_be_bytes().to_vec(),
+        V::U16(v) => v.to_be_bytes().to_vec(),
+        V::U32(v) => v.to_be_bytes().to_vec(),
+        V::U64(v) => v.to_be_bytes().to_vec(),
+
+        V::F32(v) => v.to_be_bytes().to_vec(),
+        V::F64(v) => v.to_be_bytes().to_vec(),
+
+        V::Raw(raw) => raw,
+
+        _ => {
+            return Err(Error::UnsuportedValue(v));
+        }
+    };
+    Ok(bytes)
+}

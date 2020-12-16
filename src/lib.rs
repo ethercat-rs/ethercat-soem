@@ -402,6 +402,28 @@ impl Master {
         Ok(())
     }
 
+    pub fn write_sdo_entry(
+        &mut self,
+        slave: ec::SlavePos,
+        idx: ec::SdoIdx,
+        value: ec::Value,
+        timeout: Duration,
+    ) -> Result<()> {
+        let index = u16::from(idx.idx);
+        let subindex = u8::from(idx.sub_idx);
+        let data = util::value_to_bytes(value)?;
+        let wkc = self
+            .0
+            .sdo_write(u16::from(slave) + 1, index, subindex, false, &data, timeout);
+
+        if wkc <= 0 {
+            let errs = self.ctx_errors();
+            log::debug!("{:?}", errs);
+            return Err(Error::WriteSdo(slave, idx));
+        }
+        Ok(())
+    }
+
     fn ctx_errors(&mut self) -> Vec<ctx::Error> {
         let mut errors = vec![];
         while let Some(e) = self.0.pop_error() {

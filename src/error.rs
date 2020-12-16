@@ -45,6 +45,8 @@ pub enum Error {
     WriteSdo(ec::SlavePos, ec::SdoIdx),
     #[error("Data type ({0:?}) is not supported yet")]
     UnsuportedDataType(ec::DataType),
+    #[error("Value ({0:?}) is not supported yet")]
+    UnsuportedValue(ec::Value),
     #[error("Cannot read value from empty buffer")]
     ValueFromEmptyBuf,
     #[error("Cannot convert raw data to EtherCAT value")]
