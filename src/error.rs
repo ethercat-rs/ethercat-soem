@@ -51,6 +51,8 @@ pub enum Error {
     ValueFromEmptyBuf,
     #[error("Cannot convert raw data to EtherCAT value")]
     ValueConversion(#[from] std::array::TryFromSliceError),
+    #[error("Unexpected data type")]
+    UnexpectedDataType, // TODO: add expected and actual
     #[error("No frame received")]
     NoFrame,
     #[error("Unkown frame received")]
