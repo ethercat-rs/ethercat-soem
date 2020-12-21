@@ -44,15 +44,14 @@ impl Slave {
     pub const fn eep_rev(&self) -> u32 {
         self.0.eep_rev
     }
-
-    // TODO:
-    // Interface type
-    // Itype: uint16
-
-    // TODO:
-    // Device type
-    // Dtype: uint16
-
+    /// Interface type
+    pub const fn interface_type(&self) -> u16 {
+        self.0.Itype
+    }
+    /// Device type
+    pub const fn device_type(&self) -> u16 {
+        self.0.Dtype
+    }
     /// Output bits
     pub const fn output_bits(&self) -> u16 {
         self.0.Obits
@@ -81,11 +80,10 @@ impl Slave {
         }) as usize;
         unsafe { slice::from_raw_parts_mut(self.0.outputs, size) }
     }
-
-    // TODO:
-    // startbit in first output byte
-    // Ostartbit: uint8
-
+    /// Startbit in first output byte
+    pub const fn output_start_bit(&self) -> u8 {
+        self.0.Ostartbit
+    }
     /// Input bits
     pub const fn input_bits(&self) -> u16 {
         self.0.Ibits
@@ -105,18 +103,25 @@ impl Slave {
         }) as usize;
         unsafe { slice::from_raw_parts_mut(self.0.inputs, size) }
     }
-
-    // TODO:
-    // startbit in first input byte
-    // Istartbit: uint8
+    /// Startbit in first input byte
+    pub const fn input_start_bit(&self) -> u8 {
+        self.0.Istartbit
+    }
 
     // TODO:
     // SM structure
     // SM: [ec_smt; 8]
 
-    // TODO:
-    // SM type 0=unused 1=MbxWr 2=MbxRd 3=Outputs 4=Inputs
-    // SMtype: [uint8; 8]
+    /// SM type
+    ///
+    /// 0 = unused
+    /// 1 = MbxWr
+    /// 2 = MbxRd
+    /// 3 = Outputs
+    /// 4 = Inputs
+    pub const fn sm_type(&self) -> [u8; 8] {
+        self.0.SMtype
+    }
 
     // TODO:
     // FMMU structure
@@ -138,35 +143,34 @@ impl Slave {
     // FMMU3 function
     // FMMU3func: uint8
 
-    // TODO:
-    // length of write mailbox in bytes, if no mailbox then 0
-    // mbx_l: uint16
-
-    // TODO:
-    // mailbox write offset
-    // mbx_wo: uint16
-
-    // TODO:
-    // length of read mailbox in bytes
-    // mbx_rl: uint16
-
-    // TODO:
-    // mailbox read offset
-    // mbx_ro: uint16
-
-    // TODO:
-    // mailbox supported protocols
-    // mbx_proto: uint16
-
-    // TODO:
-    // Counter value of mailbox link layer protocol 1..7
-    // mbx_cnt: uint8
-
+    /// Length of write mailbox in bytes, if no mailbox then 0
+    pub const fn mbx_l(&self) -> u16 {
+        self.0.mbx_l
+    }
+    /// mailbox write offset
+    pub const fn mbx_wo(&self) -> u16 {
+        self.0.mbx_wo
+    }
+    /// Length of read mailbox in bytes
+    pub const fn mbx_rl(&self) -> u16 {
+        self.0.mbx_rl
+    }
+    /// Mailbox read offset
+    pub const fn mbx_ro(&self) -> u16 {
+        self.0.mbx_ro
+    }
+    /// Mailbox supported protocols
+    pub const fn mbx_proto(&self) -> u16 {
+        self.0.mbx_proto
+    }
+    /// Counter value of mailbox link layer protocol 1..7
+    pub const fn mbx_cnt(&self) -> u8 {
+        self.0.mbx_cnt
+    }
     /// Has DC capability
     pub const fn has_dc(&self) -> bool {
         self.0.hasdc != 0
     }
-
     // TODO:
     // Physical type; Ebus, EtherNet combinations
     // ptype: uint8
@@ -191,27 +195,26 @@ impl Slave {
     pub const fn parent_port(&self) -> u8 {
         self.0.parentport
     }
-
-    // TODO:
-    // port number on this slave the parent is connected to
-    // entryport: uint8
-
-    // TODO:
-    // DC receivetimes on port A
-    // DCrtA: int32
-
-    // TODO:
-    // DC receivetimes on port B
-    // DCrtB: int32
-
-    // TODO:
-    // DC receivetimes on port C
-    // DCrtC: int32
-
-    // TODO:
-    // DC receivetimes on port D
-    // DCrtD: int32
-
+    /// Port number on this slave the parent is connected to
+    pub const fn entry_port(&self) -> u8 {
+        self.0.entryport
+    }
+    /// DC receivetimes on port A
+    pub const fn dc_recv_times_a(&self) -> i32 {
+        self.0.DCrtA
+    }
+    /// DC receivetimes on port B
+    pub const fn dc_recv_times_b(&self) -> i32 {
+        self.0.DCrtB
+    }
+    /// DC receivetimes on port C
+    pub const fn dc_recv_times_c(&self) -> i32 {
+        self.0.DCrtC
+    }
+    /// DC receivetimes on port D
+    pub const fn dc_recv_times_d(&self) -> i32 {
+        self.0.DCrtD
+    }
     /// Propagation delay
     pub const fn propagation_delay(&self) -> Duration {
         Duration::from_nanos(self.0.pdelay as u64)
@@ -253,25 +256,26 @@ impl Slave {
     // 0 = eeprom to master , 1 = eeprom to PDI
     // eep_pdi: uint8
 
-    // TODO:
-    // CoE details
-    // CoEdetails: uint8
-
-    // TODO:
-    // FoE details
-    // FoEdetails: uint8
-
-    // TODO:
-    // EoE details
-    // EoEdetails: uint8
-
-    // TODO:
-    // SoE details
-    // SoEdetails: uint8
-
-    // TODO:
-    // E-bus current
-    // Ebuscurrent: int16
+    /// CoE details
+    pub const fn coe_details(&self) -> u8 {
+        self.0.CoEdetails
+    }
+    /// FoE details
+    pub const fn foe_details(&self) -> u8 {
+        self.0.FoEdetails
+    }
+    /// EoE details
+    pub const fn eoe_details(&self) -> u8 {
+        self.0.EoEdetails
+    }
+    /// SoE details
+    pub const fn soe_details(&self) -> u8 {
+        self.0.SoEdetails
+    }
+    /// E-bus current
+    pub const fn ebus_current(&self) -> i16 {
+        self.0.Ebuscurrent
+    }
 
     // TODO:
     // if >0 block use of LRW in processdata
@@ -281,15 +285,15 @@ impl Slave {
     pub const fn group(&self) -> u8 {
         self.0.group
     }
-
-    // TODO:
-    // first unused FMMU
-    // FMMUunused: uint8
-
-    // TODO:
-    // Boolean for tracking whether the slave is (not) responding,
-    // not used/set by the SOEM library
-    // islost: boolean
+    /// First unused FMMU
+    pub const fn fmmu_unused(&self) -> u8 {
+        self.0.FMMUunused
+    }
+    /// Boolean for tracking whether the slave is (not) responding,
+    /// not used/set by the SOEM library
+    pub const fn is_lost(&self) -> bool {
+        self.0.islost != 0
+    }
 
     // TODO:
     // registered configuration function PO->SO, (DEPRECATED)
@@ -317,16 +321,37 @@ impl fmt::Debug for Slave {
             .field("eep_man", &self.eep_man())
             .field("eep_id", &self.eep_id())
             .field("eep_rev", &self.eep_rev())
+            .field("interface_type", &self.interface_type())
+            .field("device_type", &self.device_type())
             .field("output_bits", &self.output_bits())
             .field("output_bytes", &self.output_bytes())
             .field("outputs", &self.outputs())
+            .field("output_start_bit", &self.output_start_bit())
             .field("input_bits", &self.input_bits())
             .field("input_bytes", &self.input_bytes())
             .field("inputs", &self.inputs())
+            .field("input_start_bit", &self.input_start_bit())
+            .field("sm_type", &self.sm_type())
+            .field("mbx_l", &self.mbx_l())
+            .field("mbx_wo", &self.mbx_wo())
+            .field("mbx_rl", &self.mbx_rl())
+            .field("mbx_ro", &self.mbx_ro())
+            .field("mbx_proto", &self.mbx_proto())
+            .field("mbx_cnt", &self.mbx_cnt())
             .field("has_dc", &self.has_dc())
             .field("parent_port", &self.parent_port())
-            .field("propagation_delay", &self.propagation_delay())
-            .field("group", &self.group())
+            .field("entry_port", &self.entry_port())
+            .field("dc_recv_times_a", &self.dc_recv_times_a())
+            .field("dc_recv_times_b", &self.dc_recv_times_b())
+            .field("dc_recv_times_c", &self.dc_recv_times_c())
+            .field("dc_recv_times_d", &self.dc_recv_times_d())
+            .field("coe_details", &self.coe_details())
+            .field("foe_details", &self.foe_details())
+            .field("eoe_details", &self.eoe_details())
+            .field("soe_details", &self.soe_details())
+            .field("ebus_current", &self.ebus_current())
+            .field("fmmu_unused", &self.fmmu_unused())
+            .field("is_lost", &self.is_lost())
             .field("name", &self.name())
             .finish()
     }
