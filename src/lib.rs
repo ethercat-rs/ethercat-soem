@@ -28,7 +28,7 @@ const EC_NOFRAME: i32 = -1;
 type Result<T> = std::result::Result<T, Error>;
 
 type SdoInfo = Vec<(ec::SdoInfo, Vec<Option<ec::SdoEntryInfo>>)>;
-type PdoInfo = Vec<(ec::PdoInfo, Vec<ec::PdoEntryInfo>)>;
+type PdoInfo = Vec<(ec::PdoInfo, Vec<(ec::PdoEntryInfo, ec::SdoIdx)>)>;
 
 pub struct Master {
     ctx: Box<ctx::Ctx>,
@@ -200,7 +200,7 @@ impl Master {
         sm: u8,
         pdo_pos_offset: u8,
         pdo_entry_pos_offset: u8,
-    ) -> Result<Vec<(ec::PdoInfo, Vec<ec::PdoEntryInfo>)>> {
+    ) -> Result<Vec<(ec::PdoInfo, Vec<(ec::PdoEntryInfo, ec::SdoIdx)>)>> {
         let idx = ec::Idx::new(u16::from(SDO_IDX_PDO_ASSIGN) + sm as u16);
 
         let mut pdo_entry_pos = pdo_entry_pos_offset;
@@ -332,10 +332,10 @@ impl Master {
                     bit_len,
                     name,
                 };
-                pdo_entries.push(pdo_entry_info);
+                pdo_entries.push((pdo_entry_info, sdo_idx));
                 pdo_entry_pos += 1;
             }
-            if let Some(e) = pdo_entries.iter().nth(0) {
+            if let Some((e, _)) = pdo_entries.iter().nth(0) {
                 let sdo_idx = e.entry_idx.idx;
                 let sdo_info = self.cached_sdo_info(slave, sdo_idx);
 
