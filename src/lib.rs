@@ -23,6 +23,8 @@ const SDO_IDX_SM_COMM_TYPE: ec::Idx = ec::Idx::new(0x1C00);
 const SM_TYPE_OUTPUTS: u8 = 3;
 const SM_TYPE_INPUTS: u8 = 4;
 
+const EC_NOFRAME: i32 = -1;
+
 type Result<T> = std::result::Result<T, Error>;
 
 type SdoInfo = Vec<(ec::SdoInfo, Vec<Option<ec::SdoEntryInfo>>)>;
@@ -79,7 +81,7 @@ impl Master {
         let iface = CString::new(iface).map_err(|_| Error::Iface)?;
         let res = self.ctx.init(iface);
         if res <= 0 {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(Error::Init);
         }
         Ok(())
@@ -93,7 +95,7 @@ impl Master {
         let usetable = false;
         let res = self.ctx.config_init(usetable);
         if res <= 0 {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(match res {
                 -1 => Error::NoFrame,
                 -2 => Error::OtherFrame,
@@ -101,25 +103,27 @@ impl Master {
             });
         }
         let slave_count = self.ctx.slave_count();
-        log::debug!("{} slaves found and configured", slave_count);
+        log::debug!("{} slaves found", slave_count);
         self.request_states(ec::AlState::PreOp)?;
         self.check_states(ec::AlState::PreOp, Duration::from_millis(500))?;
         let group = 0;
         let io_map_size = self.ctx.config_map_group(group);
         if io_map_size <= 0 {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(Error::CfgMapGroup);
         }
         let res = self.ctx.config_dc();
         if res == 0 {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(Error::CfgDc);
         }
+        log::debug!("Fetch SDO info");
         for i in 0..slave_count {
             let pos = ec::SlavePos::from(i as u16);
             let sdo_info = self.read_od_list(pos)?;
             self.sdos.insert(pos, sdo_info);
         }
+        log::debug!("Fetch PDO info");
         self.pdos = self.coe_pdo_info()?;
         Ok(())
     }
@@ -401,20 +405,36 @@ impl Master {
         for i in 0..=self.ctx.slave_count() {
             self.ctx.slaves_mut()[i].set_state(s);
         }
-        let wkc = self.ctx.write_state(0);
-        if wkc <= 0 {
-            log::debug!("{:?}", self.ctx_errors());
-            log::warn!("Could not set state {:?} for slaves", state);
-            return Err(Error::SetState);
+        match self.ctx.write_state(0) {
+            EC_NOFRAME => Err(Error::NoFrame),
+            0 => {
+                if self.ctx.is_err() {
+                    log::debug!("Context errors: {:?}", self.ctx_errors());
+                }
+                log::warn!("Could not set state {:?} for slaves", state);
+                Err(Error::SetState)
+            }
+            _ => Ok(()),
         }
-        Ok(())
     }
 
     pub fn check_states(&mut self, state: ec::AlState, timeout: Duration) -> Result<()> {
         let res = self.ctx.state_check(0, u8::from(state) as u16, timeout);
         if res == 0 {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             log::warn!("Could not check state {:?} for slaves", state);
+            return Err(Error::CheckState);
+        }
+        let found_state = ec::AlState::try_from(res as u8).map_err(|_| {
+            log::warn!("Could not translate u16 `{}` into AlState", res);
+            Error::CheckState
+        })?;
+        if found_state != state {
+            log::warn!(
+                "Current state {:?} does not match expected state {:?}",
+                found_state,
+                state
+            );
             return Err(Error::CheckState);
         }
         Ok(())
@@ -428,7 +448,7 @@ impl Master {
     pub fn states(&mut self) -> Result<Vec<ec::AlState>> {
         let lowest_state = self.ctx.read_state();
         if lowest_state <= 0 {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(Error::ReadStates);
         }
         let states = (1..=self.ctx.slave_count())
@@ -448,7 +468,7 @@ impl Master {
     pub fn send_processdata(&mut self) -> Result<()> {
         self.ctx.send_processdata();
         if self.ctx.is_err() {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(Error::SendProcessData);
         }
         Ok(())
@@ -457,7 +477,7 @@ impl Master {
     pub fn recv_processdata(&mut self) -> Result<usize> {
         let wkc = self.ctx.receive_processdata(DEFAULT_RECV_TIMEOUT);
         if self.ctx.is_err() {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(Error::RecvProcessData);
         }
         Ok(wkc as usize)
@@ -466,7 +486,7 @@ impl Master {
     pub fn group_outputs_wkc(&mut self, i: usize) -> Result<usize> {
         if i >= self.ctx.groups().len() || i >= self.max_group() {
             if self.ctx.is_err() {
-                log::debug!("{:?}", self.ctx_errors());
+                log::debug!("Context errors: {:?}", self.ctx_errors());
             }
             return Err(Error::GroupId);
         }
@@ -475,7 +495,7 @@ impl Master {
 
     pub fn group_inputs_wkc(&mut self, i: usize) -> Result<usize> {
         if i >= self.ctx.groups().len() || i >= self.max_group() {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(Error::GroupId);
         }
         Ok(self.ctx.groups()[i].inputs_wkc() as usize)
@@ -497,7 +517,7 @@ impl Master {
         let res = self.ctx.read_od_description(item, od_list);
         let pos = ec::SdoPos::from(item);
         if res <= 0 {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(Error::ReadOdDesc(pos));
         }
         let i = item as usize;
@@ -520,7 +540,7 @@ impl Master {
         let res = self.ctx.read_oe(item, od_list, &mut oe_list);
         let pos = ec::SdoPos::from(item);
         if res <= 0 {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(Error::ReadOeList(pos));
         }
         Ok(oe_list)
@@ -531,7 +551,7 @@ impl Master {
         let res = self.ctx.read_od_list(u16::from(slave) + 1, &mut od_list);
 
         if res <= 0 {
-            log::debug!("{:?}", self.ctx_errors());
+            log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(Error::ReadOdList(slave));
         }
         log::debug!(
@@ -595,7 +615,7 @@ impl Master {
         );
         if wkc <= 0 {
             let errs = self.ctx_errors();
-            log::debug!("{:?}", errs);
+            log::debug!("Context errors: {:?}", errs);
             for e in errs {
                 if e.err_type == ctx::ErrType::Packet && e.abort_code == 3 {
                     log::warn!("data container too small for type");
@@ -706,7 +726,7 @@ impl Master {
 
         if wkc <= 0 {
             let errs = self.ctx_errors();
-            log::debug!("{:?}", errs);
+            log::debug!("Context errors: {:?}", errs);
             return Err(Error::WriteSdo(slave, idx));
         }
         Ok(())
@@ -728,7 +748,7 @@ impl Master {
 
         if wkc <= 0 {
             let errs = self.ctx_errors();
-            log::debug!("{:?}", errs);
+            log::debug!("Context errors: {:?}", errs);
             return Err(Error::WriteSdo(slave, idx));
         }
         Ok(())
