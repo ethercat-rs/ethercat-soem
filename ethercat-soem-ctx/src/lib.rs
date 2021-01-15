@@ -131,7 +131,9 @@ impl Default for Ctx {
 }
 
 impl Ctx {
-    /// Initialise lib in single NIC mode
+    /// Initialise lib in single NIC mode.
+    ///
+    /// Return > 0 if OK.
     pub fn init(&mut self, iface: CString) -> i32 {
         unsafe { sys::ecx_init(&mut self.ecx_ctx, iface.as_ptr()) }
     }
@@ -162,12 +164,27 @@ impl Ctx {
     pub const fn groups(&self) -> &[Group; EC_MAX_GROUP] {
         &self.group_list
     }
+    /// Write slave state, if slave = 0 then write to all slaves.
+    ///
+    /// The function does not check if the actual state is changed.
+    /// It returns Workcounter or `EC_NOFRAME` (= `-1`),
     pub fn write_state(&mut self, slave: u16) -> i32 {
         unsafe { sys::ecx_writestate(&mut self.ecx_ctx, slave) }
     }
+    /// Check actual slave state.
+    ///
+    /// This is a blocking function.
+    /// To refresh the state of all slaves `read_state()` should be called.
+    ///
+    /// Parameter `slave` = Slave number, 0 = all slaves (only the "slavelist[0].state" is refreshed).
+    ///
+    /// It returns requested state, or found state after timeout.
     pub fn state_check(&mut self, slave: u16, state: u16, timeout: Duration) -> u16 {
         unsafe { sys::ecx_statecheck(&mut self.ecx_ctx, slave, state, timeout.as_micros() as i32) }
     }
+    /// Read all slave states in ec_slave.
+    ///
+    /// It returns the lowest state found,
     pub fn read_state(&mut self) -> i32 {
         unsafe { sys::ecx_readstate(&mut self.ecx_ctx) }
     }
