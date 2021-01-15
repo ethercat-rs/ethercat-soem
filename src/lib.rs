@@ -85,8 +85,11 @@ impl Master {
         Ok(())
     }
 
+    /// Automatically configure slaves and fetch SDO & PDO information.
     pub fn auto_config(&mut self) -> Result<()> {
         log::debug!("Find and auto-config slaves");
+        self.request_states(ec::AlState::Init)?;
+        self.check_states(ec::AlState::Init, Duration::from_millis(500))?;
         let usetable = false;
         let res = self.ctx.config_init(usetable);
         if res <= 0 {
@@ -99,6 +102,8 @@ impl Master {
         }
         let slave_count = self.ctx.slave_count();
         log::debug!("{} slaves found and configured", slave_count);
+        self.request_states(ec::AlState::PreOp)?;
+        self.check_states(ec::AlState::PreOp, Duration::from_millis(500))?;
         let group = 0;
         let io_map_size = self.ctx.config_map_group(group);
         if io_map_size <= 0 {
