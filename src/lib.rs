@@ -449,7 +449,12 @@ impl Master {
         Ok(found_state)
     }
 
-    pub fn slaves(&mut self) -> &mut [ctx::Slave] {
+    pub fn slaves(&self) -> &[ctx::Slave] {
+        let cnt = self.ctx.slave_count();
+        &self.ctx.slaves()[1..=cnt]
+    }
+
+    pub fn slaves_mut(&mut self) -> &mut [ctx::Slave] {
         let cnt = self.ctx.slave_count();
         &mut self.ctx.slaves_mut()[1..=cnt]
     }
