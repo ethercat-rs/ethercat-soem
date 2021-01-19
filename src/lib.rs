@@ -57,10 +57,20 @@ impl Master {
     #[doc(hidden)]
     /// Don't use this!
     pub unsafe fn from_ptr(ctx_ptr: *mut ctx::Ctx) -> Self {
+        Master::from_ptr_with_caches(ctx_ptr, HashMap::new(), HashMap::new())
+    }
+
+    #[doc(hidden)]
+    /// Don't use this!
+    pub unsafe fn from_ptr_with_caches(
+        ctx_ptr: *mut ctx::Ctx,
+        sdos: HashMap<ec::SlavePos, SdoInfo>,
+        pdos: HashMap<ec::SlavePos, PdoInfo>,
+    ) -> Self {
         Master {
             ctx: Box::from_raw(ctx_ptr),
-            sdos: HashMap::new(),
-            pdos: HashMap::new(),
+            sdos,
+            pdos,
         }
     }
 
