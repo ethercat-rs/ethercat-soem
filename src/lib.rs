@@ -428,7 +428,7 @@ impl Master {
         }
     }
 
-    pub fn check_states(&mut self, state: ec::AlState, timeout: Duration) -> Result<()> {
+    pub fn check_states(&mut self, state: ec::AlState, timeout: Duration) -> Result<ec::AlState> {
         let res = self.ctx.state_check(0, u8::from(state) as u16, timeout);
         if res == 0 {
             log::debug!("Context errors: {:?}", self.ctx_errors());
@@ -440,14 +440,13 @@ impl Master {
             Error::CheckState
         })?;
         if found_state != state {
-            log::warn!(
+            log::debug!(
                 "Current state {:?} does not match expected state {:?}",
                 found_state,
                 state
             );
-            return Err(Error::CheckState);
         }
-        Ok(())
+        Ok(found_state)
     }
 
     pub fn slaves(&mut self) -> &mut [ctx::Slave] {
