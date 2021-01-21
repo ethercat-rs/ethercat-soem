@@ -144,7 +144,7 @@ impl Master {
         for slave in 0..self.ctx.slave_count() as u16 {
             let slave_pos = ec::SlavePos::new(slave);
 
-            let obj_cnt = self.sm_comm_type(slave_pos, 0)?;
+            let obj_cnt = self.sm_comm_type_sdo(slave_pos, 0)?;
             if obj_cnt <= 2 {
                 log::warn!("Slave {}: found less than two sync manager types", slave);
                 continue;
@@ -166,7 +166,7 @@ impl Master {
             let mut sm_types = vec![];
 
             for sm in 2..=sm_cnt {
-                let sm_type = self.sm_comm_type(slave_pos, sm + 1)?;
+                let sm_type = self.sm_comm_type_sdo(slave_pos, sm + 1)?;
                 if sm == 2 && sm_type == 2 {
                     log::warn!(
                         "SM2 has type 2 == mailbox out, this is a bug in {:?}!",
@@ -176,12 +176,21 @@ impl Master {
                 }
                 sm_types.push((sm, sm_type));
             }
-
+            for (sm, sm_type) in &sm_types {
+                let t = match sm_type {
+                    2 => "Mailbox",
+                    3 => "Outputs",
+                    4 => "Inputs",
+                    _ => "Unknown",
+                };
+                log::debug!("SM {} has type {} (= {})", sm, sm_type, t);
+            }
             let mut pdo_cnt_offset = 0;
             let mut pdo_entry_cnt_offset = 0;
 
             for t in &[SM_TYPE_OUTPUTS, SM_TYPE_INPUTS] {
                 for (sm, sm_type) in sm_types.iter().filter(|(_, sm_type)| sm_type == t) {
+                    log::debug!("Check PDO assignment for SM {}", sm);
                     let pdo_assign =
                         self.si_pdo_assign(slave_pos, *sm, pdo_cnt_offset, pdo_entry_cnt_offset)?;
                     log::debug!(
@@ -233,7 +242,11 @@ impl Master {
                 return Err(Error::UnexpectedDataType);
             }
         };
-        log::debug!("Available sub indexes of {:?}: {}", idx, pdo_cnt);
+        log::debug!(
+            "Available PDO entries in 0x{:X}: {}",
+            u16::from(idx),
+            pdo_cnt
+        );
 
         let mut pdos = vec![];
 
@@ -268,7 +281,7 @@ impl Master {
                     return Err(Error::UnexpectedDataType);
                 }
             };
-            log::debug!("... PDO IDX is 0x{:X}", u16::from(pdo_idx));
+            log::debug!("PDO IDX is 0x{:X}", u16::from(pdo_idx));
 
             log::debug!(
                 "{:?}: read PDO count from 0x{:X}.0x{:X}",
@@ -390,7 +403,7 @@ impl Master {
             .map(|(x, _)| x)
     }
 
-    fn sm_comm_type(&mut self, slave: ec::SlavePos, sub_idx: u8) -> Result<u8> {
+    fn sm_comm_type_sdo(&mut self, slave: ec::SlavePos, sub_idx: u8) -> Result<u8> {
         let val = self.read_sdo_entry(
             slave,
             ec::SdoIdx {
@@ -659,6 +672,13 @@ impl Master {
         let mut target = vec![0; byte_count];
         let raw_value = self.read_sdo(slave, idx, false, &mut target, timeout)?;
         debug_assert!(!raw_value.is_empty());
+        log::debug!(
+            "SDO raw data at {:?} 0x{:X}.{:X} is {:?}",
+            slave,
+            u16::from(idx.idx),
+            u8::from(idx.sub_idx),
+            raw_value
+        );
         Ok(util::value_from_slice(dt, raw_value)?)
     }
 
@@ -756,6 +776,13 @@ impl Master {
         let index = u16::from(idx.idx);
         let subindex = u8::from(idx.sub_idx);
         let data = util::value_to_bytes(value)?;
+        log::debug!(
+            "Write SDO raw data {:?} to {:?} 0x{:X}.{:X}",
+            data,
+            slave,
+            u16::from(idx.idx),
+            u8::from(idx.sub_idx),
+        );
         let wkc = self
             .ctx
             .sdo_write(u16::from(slave) + 1, index, subindex, false, &data, timeout);
