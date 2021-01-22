@@ -56,6 +56,12 @@ impl Master {
 
     #[doc(hidden)]
     /// Don't use this!
+    pub fn io_map(&mut self) -> &mut [u8] {
+        &mut self.ctx.io_map
+    }
+
+    #[doc(hidden)]
+    /// Don't use this!
     pub unsafe fn from_ptr(ctx_ptr: *mut ctx::Ctx) -> Self {
         Master::from_ptr_with_caches(ctx_ptr, HashMap::new(), HashMap::new())
     }

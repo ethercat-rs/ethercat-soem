@@ -58,8 +58,7 @@ pub struct Ctx {
     ecx_ctx: sys::ecx_context,
 
     /// I/O map
-    #[allow(dead_code)]
-    io_map: [u8; 4096],
+    pub io_map: [u8; 4096],
 }
 
 impl Default for Ctx {
