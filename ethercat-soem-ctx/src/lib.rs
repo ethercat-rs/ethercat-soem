@@ -13,6 +13,7 @@ mod group;
 mod od_list;
 mod oe_list;
 mod slave;
+mod sm;
 
 pub use crate::{error::*, group::*, od_list::*, oe_list::*, slave::*};
 

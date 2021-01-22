@@ -1,3 +1,4 @@
+use crate::sm::Sm;
 use ethercat_soem_sys as sys;
 use std::{fmt, mem, slice, time::Duration};
 
@@ -107,11 +108,10 @@ impl Slave {
     pub const fn input_start_bit(&self) -> u8 {
         self.0.Istartbit
     }
-
-    // TODO:
-    // SM structure
-    // SM: [ec_smt; 8]
-
+    /// SM structure
+    pub fn sm(&self) -> &[Sm; 8] {
+        unsafe { std::mem::transmute::<&[sys::ec_sm; 8], &[Sm; 8]>(&self.0.SM) }
+    }
     /// SM type
     ///
     /// 0 = unused
