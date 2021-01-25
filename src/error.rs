@@ -57,4 +57,12 @@ pub enum Error {
     NoFrame,
     #[error("Unkown frame received")]
     OtherFrame,
+    #[error("Invalid SM type")]
+    InvalidSmType,
+}
+
+impl From<ec::InvalidSmTypeError> for Error {
+    fn from(_: ec::InvalidSmTypeError) -> Self {
+        Self::InvalidSmType
+    }
 }

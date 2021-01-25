@@ -20,9 +20,6 @@ const MAX_SM_CNT: u8 = 8;
 const SDO_IDX_PDO_ASSIGN: ec::Idx = ec::Idx::new(0x1C10);
 const SDO_IDX_SM_COMM_TYPE: ec::Idx = ec::Idx::new(0x1C00);
 
-const SM_TYPE_OUTPUTS: u8 = 3;
-const SM_TYPE_INPUTS: u8 = 4;
-
 const EC_NOFRAME: i32 = -1;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -106,8 +103,6 @@ impl Master {
     /// Automatically configure slaves and fetch SDO & PDO information.
     pub fn auto_config(&mut self) -> Result<()> {
         log::debug!("Find and auto-config slaves");
-        self.request_states(ec::AlState::Init)?;
-        self.check_states(ec::AlState::Init, Duration::from_millis(500))?;
         let usetable = false;
         let res = self.ctx.config_init(usetable);
         if res <= 0 {
@@ -120,31 +115,36 @@ impl Master {
         }
         let slave_count = self.ctx.slave_count();
         log::debug!("{} slaves found", slave_count);
-        self.request_states(ec::AlState::PreOp)?;
-        self.check_states(ec::AlState::PreOp, Duration::from_millis(500))?;
+        let res = self.ctx.config_dc();
+        if res == 0 {
+            log::debug!("Context errors: {:?}", self.ctx_errors());
+            return Err(Error::CfgDc);
+        }
         let group = 0;
         let io_map_size = self.ctx.config_map_group(group);
         if io_map_size <= 0 {
             log::debug!("Context errors: {:?}", self.ctx_errors());
             return Err(Error::CfgMapGroup);
         }
-        let res = self.ctx.config_dc();
-        if res == 0 {
-            log::debug!("Context errors: {:?}", self.ctx_errors());
-            return Err(Error::CfgDc);
-        }
-        log::debug!("Fetch SDO info");
-        for i in 0..slave_count {
-            let pos = ec::SlavePos::from(i as u16);
-            let sdo_info = self.read_od_list(pos)?;
-            self.sdos.insert(pos, sdo_info);
-        }
-        log::debug!("Fetch PDO info");
+        let expected_wkc = self.group_outputs_wkc(0)? * 2 + self.group_inputs_wkc(0)?;
+        log::debug!("Expected working counter = {}", expected_wkc);
+        self.scan_slave_objects()?;
         self.pdos = self.coe_pdo_info()?;
         Ok(())
     }
 
+    fn scan_slave_objects(&mut self) -> Result<()> {
+        log::debug!("Fetch SDO info");
+        for i in 0..self.ctx.slave_count() {
+            let pos = ec::SlavePos::from(i as u16);
+            let sdo_info = self.read_od_list(pos)?;
+            self.sdos.insert(pos, sdo_info);
+        }
+        Ok(())
+    }
+
     fn coe_pdo_info(&mut self) -> Result<HashMap<ec::SlavePos, PdoInfo>> {
+        log::debug!("Fetch PDO mapping according to CoE");
         let mut res = HashMap::new();
 
         for slave in 0..self.ctx.slave_count() as u16 {
@@ -172,8 +172,8 @@ impl Master {
             let mut sm_types = vec![];
 
             for sm in 2..=sm_cnt {
-                let sm_type = self.sm_comm_type_sdo(slave_pos, sm + 1)?;
-                if sm == 2 && sm_type == 2 {
+                let sm_type = ec::SmType::try_from(self.sm_comm_type_sdo(slave_pos, sm + 1)?)?;
+                if sm == 2 && sm_type == ec::SmType::MbxRd {
                     log::warn!(
                         "SM2 has type 2 == mailbox out, this is a bug in {:?}!",
                         slave_pos
@@ -183,24 +183,23 @@ impl Master {
                 sm_types.push((sm, sm_type));
             }
             for (sm, sm_type) in &sm_types {
-                let t = match sm_type {
-                    2 => "Mailbox",
-                    3 => "Outputs",
-                    4 => "Inputs",
-                    _ => "Unknown",
-                };
-                log::debug!("SM {} has type {} (= {})", sm, sm_type, t);
+                log::debug!(
+                    "SM {} has type {} (= {:?})",
+                    sm,
+                    u8::from(*sm_type),
+                    sm_type
+                );
             }
             let mut pdo_cnt_offset = 0;
             let mut pdo_entry_cnt_offset = 0;
 
-            for t in &[SM_TYPE_OUTPUTS, SM_TYPE_INPUTS] {
+            for t in &[ec::SmType::Outputs, ec::SmType::Inputs] {
                 for (sm, sm_type) in sm_types.iter().filter(|(_, sm_type)| sm_type == t) {
                     log::debug!("Check PDO assignment for SM {}", sm);
                     let pdo_assign =
                         self.si_pdo_assign(slave_pos, *sm, pdo_cnt_offset, pdo_entry_cnt_offset)?;
                     log::debug!(
-                        "Slave {}: SM {} (type: {}): read the assigned PDOs",
+                        "Slave {}: SM {} (type: {:?}): read the assigned PDOs",
                         slave,
                         sm,
                         sm_type
