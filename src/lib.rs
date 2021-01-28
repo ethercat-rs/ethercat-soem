@@ -4,7 +4,7 @@ extern crate num_derive;
 use ethercat_soem_ctx as ctx;
 use ethercat_types as ec;
 use num_traits::cast::FromPrimitive;
-use std::{collections::HashMap, convert::TryFrom, ffi::CString, time::Duration};
+use std::{convert::TryFrom, ffi::CString, time::Duration};
 
 mod al_status;
 mod error;
@@ -29,16 +29,16 @@ type PdoInfo = Vec<(ec::PdoInfo, Vec<(ec::PdoEntryInfo, ec::SdoIdx)>)>;
 
 pub struct Master {
     ctx: Box<ctx::Ctx>,
-    sdos: HashMap<ec::SlavePos, SdoInfo>,
-    pdos: HashMap<ec::SlavePos, PdoInfo>,
+    sdos: Vec<SdoInfo>,
+    pdos: Vec<PdoInfo>,
 }
 
 impl Master {
     pub fn try_new<S: Into<String>>(iface: S) -> Result<Self> {
         let mut master = Self {
             ctx: Box::new(ctx::Ctx::default()),
-            sdos: HashMap::new(),
-            pdos: HashMap::new(),
+            sdos: vec![],
+            pdos: vec![],
         };
         master.init(iface.into())?;
         Ok(master)
@@ -60,15 +60,15 @@ impl Master {
     #[doc(hidden)]
     /// Don't use this!
     pub unsafe fn from_ptr(ctx_ptr: *mut ctx::Ctx) -> Self {
-        Master::from_ptr_with_caches(ctx_ptr, HashMap::new(), HashMap::new())
+        Master::from_ptr_with_caches(ctx_ptr, vec![], vec![])
     }
 
     #[doc(hidden)]
     /// Don't use this!
     pub unsafe fn from_ptr_with_caches(
         ctx_ptr: *mut ctx::Ctx,
-        sdos: HashMap<ec::SlavePos, SdoInfo>,
-        pdos: HashMap<ec::SlavePos, PdoInfo>,
+        sdos: Vec<SdoInfo>,
+        pdos: Vec<PdoInfo>,
     ) -> Self {
         Master {
             ctx: Box::from_raw(ctx_ptr),
@@ -79,13 +79,13 @@ impl Master {
 
     #[doc(hidden)]
     /// Don't use this!
-    pub fn sdo_info_cache(&self) -> &HashMap<ec::SlavePos, SdoInfo> {
+    pub fn sdo_info_cache(&self) -> &[SdoInfo] {
         &self.sdos
     }
 
     #[doc(hidden)]
     /// Don't use this!
-    pub fn pdo_info_cache(&self) -> &HashMap<ec::SlavePos, PdoInfo> {
+    pub fn pdo_info_cache(&self) -> &[PdoInfo] {
         &self.pdos
     }
 
@@ -138,14 +138,14 @@ impl Master {
         for i in 0..self.ctx.slave_count() {
             let pos = ec::SlavePos::from(i as u16);
             let sdo_info = self.read_od_list(pos)?;
-            self.sdos.insert(pos, sdo_info);
+            self.sdos.push(sdo_info);
         }
         Ok(())
     }
 
-    fn coe_pdo_info(&mut self) -> Result<HashMap<ec::SlavePos, PdoInfo>> {
+    fn coe_pdo_info(&mut self) -> Result<Vec<PdoInfo>> {
         log::debug!("Fetch PDO mapping according to CoE");
-        let mut res = HashMap::new();
+        let mut res = vec![];
 
         for slave in 0..self.ctx.slave_count() as u16 {
             let slave_pos = ec::SlavePos::new(slave);
@@ -212,7 +212,7 @@ impl Master {
                     pdo_info.extend_from_slice(&pdo_assign);
                 }
             }
-            res.insert(slave_pos, pdo_info);
+            res.push(pdo_info);
         }
         Ok(res)
     }
@@ -373,7 +373,7 @@ impl Master {
         idx: ec::SdoIdx,
     ) -> Option<&ec::SdoEntryInfo> {
         self.sdos
-            .get(&slave)
+            .get(usize::from(slave))
             .and_then(|sdos| sdos.iter().find(|(info, _entries)| info.idx == idx.idx))
             .map(|(_, x)| x)
             .and_then(|entries| entries.get(u8::from(idx.sub_idx) as usize))
@@ -382,7 +382,7 @@ impl Master {
 
     fn cached_sdo_info(&mut self, slave: ec::SlavePos, idx: ec::Idx) -> Option<&ec::SdoInfo> {
         self.sdos
-            .get(&slave)
+            .get(usize::from(slave))
             .and_then(|sdos| sdos.iter().find(|(info, _entries)| info.idx == idx))
             .map(|(x, _)| x)
     }
@@ -641,7 +641,7 @@ impl Master {
     ) -> Result<ec::Value> {
         let info = self
             .sdos
-            .get(&slave)
+            .get(usize::from(slave))
             .and_then(|info| info.iter().find(|(info, _)| info.idx == idx.idx))
             .and_then(|(_, entries)| entries.get(u8::from(idx.sub_idx) as usize))
             .and_then(Option::as_ref)
@@ -670,7 +670,7 @@ impl Master {
     ) -> Result<Vec<Option<ec::Value>>> {
         let entries = self
             .sdos
-            .get(&slave)
+            .get(usize::from(slave))
             .and_then(|info| info.iter().find(|(info, _)| info.idx == idx))
             .map(|(_, entries)| entries)
             .ok_or(Error::IdxNotFound(slave, idx))?;
