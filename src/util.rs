@@ -3,14 +3,17 @@ use ethercat_types::{DataType, Value};
 use std::convert::TryInto;
 
 // TODO: impl TryFrom<&[u8]> for Value in ethercat-types
-pub fn value_from_slice(dt: DataType, raw: &[u8]) -> Result<Value> {
+pub fn value_from_slice(dt: DataType, raw: &[u8], bit_offset: usize) -> Result<Value> {
     debug_assert!(!raw.is_empty());
     if raw.is_empty() {
         return Err(Error::ValueFromEmptyBuf);
     }
 
     let val = match dt {
-        DataType::Bool => Value::Bool(raw[0] == 1),
+        DataType::Bool => {
+            let bit_mask = 1 << bit_offset;
+            Value::Bool((raw[0] & bit_mask) != 0)
+        }
         DataType::Byte => Value::Byte(raw[0]),
 
         DataType::I8 => Value::I8(raw[0] as i8),
@@ -103,4 +106,41 @@ pub fn value_to_bytes(v: Value) -> Result<Vec<u8>> {
         }
     };
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bool_from_raw_slice() {
+        assert_eq!(
+            value_from_slice(DataType::Bool, &[0], 0).unwrap(),
+            Value::Bool(false)
+        );
+        assert_eq!(
+            value_from_slice(DataType::Bool, &[1], 0).unwrap(),
+            Value::Bool(true)
+        );
+        assert_eq!(
+            value_from_slice(DataType::Bool, &[0b_1111_1111], 0).unwrap(),
+            Value::Bool(true)
+        );
+        assert_eq!(
+            value_from_slice(DataType::Bool, &[0b_1111_1011], 2).unwrap(),
+            Value::Bool(false)
+        );
+        assert_eq!(
+            value_from_slice(DataType::Bool, &[0b_1000_0000], 7).unwrap(),
+            Value::Bool(true)
+        );
+        assert_eq!(
+            value_from_slice(DataType::Bool, &[0b_1000_0000], 0).unwrap(),
+            Value::Bool(false)
+        );
+        assert_eq!(
+            value_from_slice(DataType::Bool, &[0b_0010_0000], 5).unwrap(),
+            Value::Bool(true)
+        );
+    }
 }

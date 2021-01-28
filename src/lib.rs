@@ -25,7 +25,10 @@ const EC_NOFRAME: i32 = -1;
 type Result<T> = std::result::Result<T, Error>;
 
 type SdoInfo = Vec<(ec::SdoInfo, Vec<Option<ec::SdoEntryInfo>>)>;
-type PdoInfo = Vec<(ec::PdoInfo, Vec<(ec::PdoEntryInfo, ec::SdoIdx)>)>;
+type PdoInfo = Vec<(
+    ec::PdoInfo,
+    Vec<(ec::PdoEntryInfo, ec::DataType, ec::SdoIdx)>,
+)>;
 
 pub struct Master {
     ctx: Box<ctx::Ctx>,
@@ -224,7 +227,7 @@ impl Master {
         sm: u8,
         pdo_pos_offset: u8,
         pdo_entry_pos_offset: u8,
-    ) -> Result<Vec<(ec::PdoInfo, Vec<(ec::PdoEntryInfo, ec::SdoIdx)>)>> {
+    ) -> Result<PdoInfo> {
         let idx = ec::Idx::new(u16::from(SDO_IDX_PDO_ASSIGN) + sm as u16);
 
         let mut pdo_entry_pos = pdo_entry_pos_offset;
@@ -319,14 +322,14 @@ impl Master {
                 let sdo_idx = ec::SdoIdx::new(obj_idx, obj_subidx);
                 let sdo_entry = self.cached_sdo_entry(slave, sdo_idx);
 
-                let name = match sdo_entry {
+                let (name, data_type) = match sdo_entry {
                     Some(e) => {
                         debug_assert_eq!(bit_len as u16, e.bit_len);
-                        e.description.clone()
+                        (e.description.clone(), e.data_type)
                     }
                     None => {
                         log::warn!("Could not find SDO ({:?}) entry description", sdo_idx);
-                        String::new()
+                        (String::new(), ec::DataType::Raw)
                     }
                 };
 
@@ -339,10 +342,10 @@ impl Master {
                     bit_len,
                     name,
                 };
-                pdo_entries.push((pdo_entry_info, sdo_idx));
+                pdo_entries.push((pdo_entry_info, data_type, sdo_idx));
                 pdo_entry_pos += 1;
             }
-            if let Some((e, _)) = pdo_entries.iter().nth(0) {
+            if let Some((e, _, _)) = pdo_entries.iter().nth(0) {
                 let sdo_idx = e.entry_idx.idx;
                 let sdo_info = self.cached_sdo_info(slave, sdo_idx);
 
@@ -659,7 +662,7 @@ impl Master {
             u8::from(idx.sub_idx),
             raw_value
         );
-        Ok(util::value_from_slice(dt, raw_value)?)
+        Ok(util::value_from_slice(dt, raw_value, 0)?)
     }
 
     pub fn read_sdo_complete(
@@ -708,7 +711,7 @@ impl Master {
             let res = match e {
                 Some((cnt, data_type)) => {
                     let raw_value = &raw[byte_pos..byte_pos + cnt];
-                    let val = util::value_from_slice(data_type, raw_value)?;
+                    let val = util::value_from_slice(data_type, raw_value, 0)?;
                     byte_pos += cnt;
                     Some(val)
                 }
@@ -775,12 +778,77 @@ impl Master {
         Ok(())
     }
 
+    pub fn pdo_values(&self) -> Vec<Vec<(ec::Idx, Vec<ec::Value>)>> {
+        let mut all_pdos = vec![];
+        for (i, slave) in self.slaves().iter().enumerate() {
+            let mut slave_pdos = vec![];
+            if let Some(pdo_meta_data) = self.pdos.get(i) {
+                let inputs: &[u8] = slave.inputs();
+                let outputs: &[u8] = slave.outputs();
+
+                let mut i_offset = 0_usize;
+                let mut o_offset = 0_usize;
+
+                for (pdo_info, pdo_entries) in pdo_meta_data {
+                    let mut pdos = vec![];
+                    for (pdo_entry, data_type, _) in pdo_entries {
+                        let sm_idx = u8::from(pdo_info.sm) as usize;
+
+                        let byte_count = byte_cnt(pdo_entry.bit_len as usize);
+
+                        match slave
+                            .sm_type()
+                            .get(sm_idx)
+                            .and_then(|t| ec::SmType::try_from(*t).ok())
+                        {
+                            Some(ec::SmType::Inputs) => {
+                                let offset = byte_cnt(i_offset);
+                                let raw = &inputs[offset..offset + byte_count];
+                                if let Ok(val) =
+                                    util::value_from_slice(*data_type, raw, i_offset % 8)
+                                {
+                                    pdos.push(val);
+                                }
+                                i_offset += pdo_entry.bit_len as usize;
+                            }
+                            Some(ec::SmType::Outputs) => {
+                                let offset = byte_cnt(o_offset);
+                                let raw = &outputs[offset..offset + byte_count];
+                                if let Ok(val) =
+                                    util::value_from_slice(*data_type, raw, o_offset % 8)
+                                {
+                                    pdos.push(val);
+                                }
+                                o_offset += pdo_entry.bit_len as usize;
+                            }
+                            _ => {}
+                        }
+                    }
+                    slave_pdos.push((pdo_info.idx, pdos));
+                }
+            } else {
+                log::warn!("Could not find PDO meta data for Slave {}", i);
+            }
+            all_pdos.push(slave_pdos);
+        }
+
+        all_pdos
+    }
+
     fn ctx_errors(&mut self) -> Vec<ctx::Error> {
         let mut errors = vec![];
         while let Some(e) = self.ctx.pop_error() {
             errors.push(e);
         }
         errors
+    }
+}
+
+fn byte_cnt(bits: usize) -> usize {
+    if bits % 8 == 0 {
+        bits / 8
+    } else {
+        (bits / 8) + 1
     }
 }
 
