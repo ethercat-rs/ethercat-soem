@@ -14,17 +14,17 @@ pub fn value_from_slice(dt: DataType, raw: &[u8]) -> Result<Value> {
         DataType::Byte => Value::Byte(raw[0]),
 
         DataType::I8 => Value::I8(raw[0] as i8),
-        DataType::I16 => Value::I16(i16::from_be_bytes(raw.try_into()?)),
-        DataType::I32 => Value::I32(i32::from_be_bytes(raw.try_into()?)),
-        DataType::I64 => Value::I64(i64::from_be_bytes(raw.try_into()?)),
+        DataType::I16 => Value::I16(i16::from_ne_bytes(raw.try_into()?)),
+        DataType::I32 => Value::I32(i32::from_ne_bytes(raw.try_into()?)),
+        DataType::I64 => Value::I64(i64::from_ne_bytes(raw.try_into()?)),
 
         DataType::U8 => Value::U8(raw[0]),
-        DataType::U16 => Value::U16(u16::from_be_bytes(raw.try_into()?)),
-        DataType::U32 => Value::U32(u32::from_be_bytes(raw.try_into()?)),
-        DataType::U64 => Value::U64(u64::from_be_bytes(raw.try_into()?)),
+        DataType::U16 => Value::U16(u16::from_ne_bytes(raw.try_into()?)),
+        DataType::U32 => Value::U32(u32::from_ne_bytes(raw.try_into()?)),
+        DataType::U64 => Value::U64(u64::from_ne_bytes(raw.try_into()?)),
 
-        DataType::F32 => Value::F32(f32::from_be_bytes(raw.try_into()?)),
-        DataType::F64 => Value::F64(f64::from_be_bytes(raw.try_into()?)),
+        DataType::F32 => Value::F32(f32::from_ne_bytes(raw.try_into()?)),
+        DataType::F64 => Value::F64(f64::from_ne_bytes(raw.try_into()?)),
 
         DataType::String => Value::String(String::from_utf8_lossy(raw).to_string()),
 
@@ -83,18 +83,18 @@ pub fn value_to_bytes(v: Value) -> Result<Vec<u8>> {
         }
         V::Byte(v) => vec![v],
 
-        V::I8(v) => v.to_be_bytes().to_vec(),
-        V::I16(v) => v.to_be_bytes().to_vec(),
-        V::I32(v) => v.to_be_bytes().to_vec(),
-        V::I64(v) => v.to_be_bytes().to_vec(),
+        V::I8(v) => v.to_ne_bytes().to_vec(),
+        V::I16(v) => v.to_ne_bytes().to_vec(),
+        V::I32(v) => v.to_ne_bytes().to_vec(),
+        V::I64(v) => v.to_ne_bytes().to_vec(),
 
-        V::U8(v) => v.to_be_bytes().to_vec(),
-        V::U16(v) => v.to_be_bytes().to_vec(),
-        V::U32(v) => v.to_be_bytes().to_vec(),
-        V::U64(v) => v.to_be_bytes().to_vec(),
+        V::U8(v) => v.to_ne_bytes().to_vec(),
+        V::U16(v) => v.to_ne_bytes().to_vec(),
+        V::U32(v) => v.to_ne_bytes().to_vec(),
+        V::U64(v) => v.to_ne_bytes().to_vec(),
 
-        V::F32(v) => v.to_be_bytes().to_vec(),
-        V::F64(v) => v.to_be_bytes().to_vec(),
+        V::F32(v) => v.to_ne_bytes().to_vec(),
+        V::F64(v) => v.to_ne_bytes().to_vec(),
 
         V::Raw(raw) => raw,
 

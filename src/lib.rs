@@ -229,24 +229,18 @@ impl Master {
 
         let mut pdo_entry_pos = pdo_entry_pos_offset;
 
-        let pdo_cnt = self.read_sdo_entry(
+        let mut val = [0];
+        self.read_sdo(
             slave,
             ec::SdoIdx {
                 idx,
                 sub_idx: ec::SubIdx::new(0),
             },
+            false,
+            &mut val,
             DEFAULT_SDO_TIMEOUT,
         )?;
-        let pdo_cnt = match pdo_cnt {
-            ec::Value::U8(x) => x,
-            _ => {
-                log::warn!(
-                    "Could not read number of PDOs from {:?}: unexpected data type",
-                    slave
-                );
-                return Err(Error::UnexpectedDataType);
-            }
-        };
+        let pdo_cnt = val[0];
         log::debug!(
             "Available PDO entries in 0x{:X}: {}",
             u16::from(idx),
@@ -264,28 +258,20 @@ impl Master {
                 u16::from(idx),
                 pdo_sub
             );
-            let val = self.read_sdo_entry(
+
+            let mut val = [0; 2];
+            self.read_sdo(
                 slave,
                 ec::SdoIdx {
                     idx,
                     sub_idx: pdo_sub.into(),
                 },
+                false,
+                &mut val,
                 DEFAULT_SDO_TIMEOUT,
             )?;
 
-            let pdo_idx = match val {
-                ec::Value::U16(idx) => {
-                    let idx = u16::from_be(idx);
-                    ec::Idx::new(idx)
-                }
-                _ => {
-                    log::warn!(
-                        "Could not read number of PDOs from {:?}: unexpected data type",
-                        slave
-                    );
-                    return Err(Error::UnexpectedDataType);
-                }
-            };
+            let pdo_idx = ec::Idx::new(u16::from_ne_bytes(val));
             log::debug!("PDO IDX is 0x{:X}", u16::from(pdo_idx));
 
             log::debug!(
@@ -294,23 +280,19 @@ impl Master {
                 u16::from(pdo_idx),
                 0
             );
-            let val = self.read_sdo_entry(
+            let mut val = [0];
+            self.read_sdo(
                 slave,
                 ec::SdoIdx {
                     idx: pdo_idx,
                     sub_idx: ec::SubIdx::new(0),
                 },
+                false,
+                &mut val,
                 DEFAULT_SDO_TIMEOUT,
             )?;
-            log::debug!("... PDO count is {:?}", val);
-
-            let pdo_entry_cnt = match val {
-                ec::Value::U8(n) => n,
-                _ => {
-                    log::warn!("Could not read number of PDOs entries from {:?} {:?}: unexpected data type", pdo_idx, slave);
-                    return Err(Error::UnexpectedDataType);
-                }
-            };
+            let pdo_entry_cnt = val[0];
+            log::debug!("... PDO count is {}", pdo_entry_cnt);
 
             let mut pdo_entries = vec![];
 
@@ -320,19 +302,16 @@ impl Master {
                     sub_idx: ec::SubIdx::new(entry_sub),
                 };
 
-                let val = self.read_sdo_entry(slave, pdo_data_sdo_idx, DEFAULT_SDO_TIMEOUT)?;
+                let mut val = [0; 4];
+                self.read_sdo(
+                    slave,
+                    pdo_data_sdo_idx,
+                    false,
+                    &mut val,
+                    DEFAULT_SDO_TIMEOUT,
+                )?;
 
-                let data = match val {
-                    ec::Value::U32(x) => u32::from_be(x),
-                    _ => {
-                        log::warn!(
-                            "Could not read PDO entry data from {:?} {:?}: unexpected data type",
-                            pdo_data_sdo_idx,
-                            slave
-                        );
-                        return Err(Error::UnexpectedDataType);
-                    }
-                };
+                let data = u32::from_ne_bytes(val);
                 let bit_len = (data & 0x_00FF) as u8;
                 let obj_idx = (data >> 16) as u16;
                 let obj_subidx = ((data >> 8) & 0x_0000_00FF) as u8;
@@ -409,22 +388,18 @@ impl Master {
     }
 
     fn sm_comm_type_sdo(&mut self, slave: ec::SlavePos, sub_idx: u8) -> Result<u8> {
-        let val = self.read_sdo_entry(
+        let mut val = [0];
+        self.read_sdo(
             slave,
             ec::SdoIdx {
                 idx: SDO_IDX_SM_COMM_TYPE,
                 sub_idx: sub_idx.into(),
             },
+            false,
+            &mut val,
             DEFAULT_SDO_TIMEOUT,
         )?;
-        let val = match val {
-            ec::Value::U8(x) => x,
-            _ => {
-                log::warn!("Could not read SyncManager communication type information of {:?}: unexpected data type", slave);
-                return Err(Error::UnexpectedDataType);
-            }
-        };
-        Ok(val)
+        Ok(val[0])
     }
 
     pub fn request_states(&mut self, state: ec::AlState) -> Result<()> {
