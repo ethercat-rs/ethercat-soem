@@ -59,6 +59,10 @@ pub enum Error {
     OtherFrame,
     #[error("Invalid SM type")]
     InvalidSmType,
+    #[error("{0:?} not found")]
+    SlaveNotFound(ec::SlavePos),
+    #[error("PDO entry {0:?} not found")]
+    PdoEntryNotFound(ec::PdoEntryIdx),
 }
 
 impl From<ec::InvalidSmTypeError> for Error {

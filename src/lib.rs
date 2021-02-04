@@ -28,7 +28,7 @@ type SdoInfo = Vec<(ec::SdoInfo, Vec<Option<ec::SdoEntryInfo>>)>;
 type PdoInfo = Vec<(ec::PdoInfo, Vec<PdoEntryInfo>)>;
 
 // TODO: merge into ec::PdoEntryInfo
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PdoEntryInfo {
     pub idx: ec::PdoEntryIdx,
     pub pos: ec::PdoEntryPos,
@@ -185,7 +185,13 @@ impl Master {
             let mut sm_types = vec![];
 
             for sm in 2..=sm_cnt {
-                let sm_type = ec::SmType::try_from(self.sm_comm_type_sdo(slave_pos, sm + 1)?)?;
+                let sm_type_id = self
+                    .slaves()
+                    .get(slave as usize)
+                    .and_then(|s: &ctx::Slave| s.sm_type().get(sm as usize).cloned())
+                    .ok_or(Error::InvalidSmType)?;
+
+                let sm_type = ec::SmType::try_from(sm_type_id)?;
                 if sm == 2 && sm_type == ec::SmType::MbxRd {
                     log::warn!(
                         "SM2 has type 2 == mailbox out, this is a bug in {:?}!",
@@ -827,6 +833,48 @@ impl Master {
         }
 
         all_pdos
+    }
+
+    pub fn set_pdo_value(
+        &mut self,
+        slave: ec::SlavePos,
+        idx: ec::PdoEntryIdx,
+        v: ec::Value,
+    ) -> Result<()> {
+        let (data_type, offset) = {
+            let e = self
+                .pdos
+                .get(usize::from(slave))
+                .ok_or(Error::SlaveNotFound(slave))?
+                .iter()
+                .find(|(info, _)| info.idx == idx.idx)
+                .and_then(|(_, entries)| entries.iter().find(|e| e.idx == idx))
+                .ok_or(Error::PdoEntryNotFound(idx))?;
+            if e.sm != ec::SmType::Outputs {
+                return Err(Error::InvalidSmType);
+            }
+            (e.data_type, e.offset)
+        };
+        let s: &mut ctx::Slave = self
+            .slaves_mut()
+            .get_mut(usize::from(slave))
+            .ok_or(Error::SlaveNotFound(slave))?;
+        let bytes = util::value_to_bytes(v)?;
+
+        if data_type == ec::DataType::Bool {
+            debug_assert_eq!(bytes.len(), 1);
+            let mask = 1 << offset.bit;
+            if bytes[0] == 1 {
+                s.outputs_mut()[offset.byte] |= mask; // Set Bit
+            } else {
+                s.outputs_mut()[offset.byte] &= !mask; // Clear Bit
+            }
+        } else {
+            for (i, b) in bytes.into_iter().enumerate() {
+                s.outputs_mut()[offset.byte + i] = b;
+            }
+        }
+        Ok(())
     }
 
     fn ctx_errors(&mut self) -> Vec<ctx::Error> {
