@@ -110,7 +110,7 @@ impl Slave {
     }
     /// SM structure
     pub fn sm(&self) -> &[Sm; 8] {
-        unsafe { std::mem::transmute::<&[sys::ec_sm; 8], &[Sm; 8]>(&self.0.SM) }
+        unsafe { mem::transmute::<&[sys::ec_sm; 8], &[Sm; 8]>(&self.0.SM) }
     }
     /// SM type
     ///
@@ -122,27 +122,26 @@ impl Slave {
     pub const fn sm_type(&self) -> [u8; 8] {
         self.0.SMtype
     }
-
-    // TODO:
-    // FMMU structure
-    // FMMU: [ec_fmmut; 4]
-
-    // TODO:
-    // FMMU0 function
-    // FMMU0func: uint8
-
-    // TODO:
-    // FMMU1 function
-    // FMMU1func: uint8
-
-    // TODO:
-    // FMMU2 function
-    // FMMU2func: uint8
-
-    // TODO:
-    // FMMU3 function
-    // FMMU3func: uint8
-
+    /// FMMU structure
+    pub const fn fmmu(&self) -> &[sys::ec_fmmut; 4] {
+        &self.0.FMMU
+    }
+    /// FMMU 0 function
+    pub const fn fmmu_0_func(&self) -> u8 {
+        self.0.FMMU0func
+    }
+    /// FMMU 1 function
+    pub const fn fmmu_1_func(&self) -> u8 {
+        self.0.FMMU1func
+    }
+    /// FMMU 2 function
+    pub const fn fmmu_2_func(&self) -> u8 {
+        self.0.FMMU2func
+    }
+    /// FMMU 3 function
+    pub const fn fmmu_3_func(&self) -> u8 {
+        self.0.FMMU3func
+    }
     /// Length of write mailbox in bytes, if no mailbox then 0
     pub const fn mbx_l(&self) -> u16 {
         self.0.mbx_l
@@ -332,6 +331,11 @@ impl fmt::Debug for Slave {
             .field("inputs", &self.inputs())
             .field("input_start_bit", &self.input_start_bit())
             .field("sm_type", &self.sm_type())
+            .field("fmmu", &self.fmmu())
+            .field("fmmu_0_func", &self.fmmu_0_func())
+            .field("fmmu_1_func", &self.fmmu_1_func())
+            .field("fmmu_2_func", &self.fmmu_2_func())
+            .field("fmmu_3_func", &self.fmmu_3_func())
             .field("mbx_l", &self.mbx_l())
             .field("mbx_wo", &self.mbx_wo())
             .field("mbx_rl", &self.mbx_rl())
