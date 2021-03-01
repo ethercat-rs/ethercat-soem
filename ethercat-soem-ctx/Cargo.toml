@@ -1,6 +1,6 @@
 [package]
 name = "ethercat-soem-ctx"
-version = "0.1.0"
+version = "0.1.1"
 description = "Wrapper for the SOEM open-source EtherCAT master context"
 authors = ["Markus Kohlhase <markus.kohlhase@slowtec.de>"]
 license = "GPL-2.0-only"
