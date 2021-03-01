@@ -1,6 +1,6 @@
 [package]
 name = "ethercat-soem"
-version = "0.0.0"
+version = "0.1.0"
 description = "Binding to the SOEM open-source EtherCAT master"
 authors = ["Markus Kohlhase <markus.kohlhase@slowtec.de>"]
 readme = "README.md"
@@ -15,7 +15,7 @@ num-traits = "0.2"
 thiserror = "1"
 
 [dependencies.ethercat-soem-ctx]
-version = "0.1"
+version = "0.1.1"
 path = "ethercat-soem-ctx"
 
 [dev-dependencies]
@@ -25,3 +25,6 @@ env_logger = "0.8"
 [features]
 # See https://github.com/OpenEtherCATsociety/SOEM/issues/224#issuecomment-525872643
 issue-224-workaround = ["ethercat-soem-ctx/issue-224-workaround"]
+
+[badges]
+maintenance = { status = "actively-developed" }

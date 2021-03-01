@@ -350,7 +350,7 @@ impl Master {
                 pdo_entries.push(pdo_entry_info);
                 pdo_entry_pos += 1;
             }
-            if let Some(e) = pdo_entries.iter().nth(0) {
+            if let Some(e) = pdo_entries.get(0) {
                 let sdo_info = self.cached_sdo_info(slave, e.sdo.idx);
 
                 let name = match sdo_info {
