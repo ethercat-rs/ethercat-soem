@@ -32,17 +32,17 @@ pub enum Error {
     #[error("Could not read OD list of {0:?}")]
     ReadOdList(ec::SlavePos),
     #[error("Could not read OD description of {0:?}")]
-    ReadOdDesc(ec::SdoPos),
+    ReadOdDesc(ec::ObjectPos),
     #[error("Could not read OE list of {0:?}")]
-    ReadOeList(ec::SdoPos),
+    ReadOeList(ec::ObjectPos),
     #[error("Could not read {1:?} of {0:?}")]
-    ReadSdo(ec::SlavePos, ec::SdoIdx),
+    ReadSdo(ec::SlavePos, ec::EntryIdx),
     #[error("Index {1:?} not found at {0:?}")]
     IdxNotFound(ec::SlavePos, ec::Idx),
     #[error("Subindex {1:?} not found at {0:?}")]
-    SubIdxNotFound(ec::SlavePos, ec::SdoIdx),
+    SubIdxNotFound(ec::SlavePos, ec::EntryIdx),
     #[error("Could not write {1:?} of {0:?}")]
-    WriteSdo(ec::SlavePos, ec::SdoIdx),
+    WriteSdo(ec::SlavePos, ec::EntryIdx),
     #[error("Data type ({0:?}) is not supported yet")]
     UnsuportedDataType(ec::DataType),
     #[error("Value ({0:?}) is not supported yet")]
@@ -62,7 +62,9 @@ pub enum Error {
     #[error("{0:?} not found")]
     SlaveNotFound(ec::SlavePos),
     #[error("PDO entry {0:?} not found")]
-    PdoEntryNotFound(ec::PdoEntryIdx),
+    PdoEntryNotFound(ec::EntryIdx),
+    #[error("No output PDOs found for {0:?}")]
+    NoOutputPdos(ec::SlavePos),
 }
 
 impl From<ec::InvalidSmTypeError> for Error {
