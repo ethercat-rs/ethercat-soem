@@ -6,7 +6,7 @@ authors = ["Matwey V. Kornilov <matwey.kornilov@gmail.com>", "Markus Kohlhase <m
 repository = "https://github.com/ethercat-rs/ethercat-soem"
 readme = "README.md"
 license = "GPL-2.0-only"
-edition = "2018"
+edition = "2021"
 
 [build-dependencies]
 bindgen = "0.59"
