@@ -3,6 +3,7 @@ name = "ethercat-soem-sys"
 version = "0.1.0"
 description = "Binding to the SOEM open-source EtherCAT master"
 authors = ["Matwey V. Kornilov <matwey.kornilov@gmail.com>", "Markus Kohlhase <markus.kohlhase@slowtec.de>"]
+repository = "https://github.com/ethercat-rs/ethercat-soem"
 readme = "README.md"
 license = "GPL-2.0-only"
 edition = "2018"
