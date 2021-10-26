@@ -91,6 +91,22 @@ impl Master {
     }
 
     #[doc(hidden)]
+    /// Drop a secondary instance safely
+    ///
+    /// Drop an instance that has been created with `from_ptr` or `from_ptr_with_caches`
+    /// from a shared context pointer that is dropped later. Otherwise dropping this
+    /// instance would result in a double-free.
+    ///
+    /// TODO: Avoid all these ugly hacks!
+    pub fn leak_ptr(self) {
+        let Self {
+            ctx,
+            ..
+        } = self;
+        ctx.leak();
+    }
+
+    #[doc(hidden)]
     /// Don't use this!
     pub fn sdo_info_cache(&self) -> &[SdoInfo] {
         &self.sdos
