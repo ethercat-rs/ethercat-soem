@@ -99,10 +99,7 @@ impl Master {
     ///
     /// TODO: Avoid all these ugly hacks!
     pub fn leak_ptr(self) {
-        let Self {
-            ctx,
-            ..
-        } = self;
+        let Self { ctx, .. } = self;
         Box::leak(ctx);
     }
 
