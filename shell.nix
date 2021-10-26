@@ -11,5 +11,5 @@ in
       cmake
       pkgconfig
     ];
-    LIBCLANG_PATH = "${llvmPackages.libclang}/lib";
+    LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
 }
