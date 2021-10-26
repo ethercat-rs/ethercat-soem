@@ -682,7 +682,7 @@ impl Master {
             u8::from(idx.sub_idx),
             raw_value
         );
-        Ok(util::value_from_slice(dt, raw_value, 0)?)
+        util::value_from_slice(dt, raw_value, 0)
     }
 
     pub fn read_sdo_complete(
