@@ -1,5 +1,18 @@
 //! SOEM low level context
 
+#![cfg_attr(not(debug_assertions), deny(warnings))]
+#![deny(rust_2018_idioms)]
+#![deny(rust_2021_compatibility)]
+#![deny(missing_debug_implementations)]
+#![deny(rustdoc::broken_intra_doc_links)]
+#![deny(clippy::all)]
+#![deny(clippy::explicit_deref_methods)]
+#![deny(clippy::explicit_into_iter_loop)]
+#![deny(clippy::explicit_iter_loop)]
+#![deny(clippy::must_use_candidate)]
+#![cfg_attr(not(test), deny(clippy::panic_in_result_fn))]
+#![cfg_attr(not(debug_assertions), deny(clippy::used_underscore_binding))]
+
 use ethercat_soem_sys as sys;
 use std::{
     ffi::{CStr, CString},
@@ -27,6 +40,7 @@ const EC_MAX_EEP_BITMAP: usize = 128;
 const EC_MAX_EEP_BUF: usize = EC_MAX_EEP_BITMAP << 5;
 
 /// SOEM `ecx_context` wrapper
+#[allow(missing_debug_implementations)]
 pub struct Ctx {
     #[allow(dead_code)]
     port: Box<sys::ecx_portt>,
