@@ -1,6 +1,6 @@
 [package]
 name = "ethercat-soem"
-version = "0.1.0"
+version = "0.2.0"
 description = "Binding to the SOEM open-source EtherCAT master"
 authors = ["Markus Kohlhase <markus.kohlhase@slowtec.de>"]
 readme = "README.md"
@@ -15,7 +15,7 @@ num-traits = "0.2.14"
 thiserror = "1.0.30"
 
 [dependencies.ethercat-soem-ctx]
-version = "0.1.1"
+version = "0.2"
 path = "ethercat-soem-ctx"
 
 [dev-dependencies]

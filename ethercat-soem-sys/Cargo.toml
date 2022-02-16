@@ -1,6 +1,6 @@
 [package]
 name = "ethercat-soem-sys"
-version = "0.1.0"
+version = "0.2.0"
 description = "Binding to the SOEM open-source EtherCAT master"
 authors = ["Matwey V. Kornilov <matwey.kornilov@gmail.com>", "Markus Kohlhase <markus.kohlhase@slowtec.de>"]
 repository = "https://github.com/ethercat-rs/ethercat-soem"

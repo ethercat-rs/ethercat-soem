@@ -4,7 +4,7 @@
 
 ```toml
 [dependencies]
-ethercat-soem = "0.1"
+ethercat-soem = "0.2"
 ```
 
 ## License
