@@ -33,14 +33,15 @@ fn read_sdo(ifname: &str) -> Result<()> {
     let mut read_times = vec![];
 
     // Dirty hack to use the same underlying SOEM context
-    // within an other thread.
+    // within another thread.
+    // usize works independent of the CPU architecture (32/64-bit)
     let master_ptr = master.ptr();
-    let ptr_addr: u64 = unsafe { std::mem::transmute(master_ptr) };
+    let master_ptr_addr = master_ptr as usize;
 
     thread::spawn(move || {
         let mut rt_master = unsafe {
-            let ptr = std::mem::transmute(ptr_addr);
-            soem::Master::from_ptr(ptr)
+            let master_ptr = std::mem::transmute(master_ptr_addr);
+            soem::Master::from_ptr(master_ptr)
         };
         loop {
             let cycle_start = Instant::now();
