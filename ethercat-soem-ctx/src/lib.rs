@@ -106,6 +106,7 @@ impl Default for Ctx {
             FOEhook: None,
             EOEhook: None,
             manualstatechange: 0,
+            userdata: std::ptr::null_mut(),
         };
 
         Self {
