@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate num_derive;
-
 use ethercat_soem_ctx as ctx;
 use ethercat_types as ec;
 use num_traits::cast::FromPrimitive;

@@ -1,14 +1,18 @@
-use num_traits::cast::FromPrimitive;
+use num_derive::FromPrimitive;
+use num_traits::cast::FromPrimitive as _;
 
 // TODO: auto generate from `ethercatprint.c`
 
 /// AL status code
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
+#[repr(u16)]
 pub enum AlStatus {
     /// No error
     NoError = 0x0000,
+
     /// Unspecified error
     UnspecifiedError = 0x0001,
+
     /// No memory,
     NoMemory = 0x0002,
 
@@ -25,12 +29,15 @@ pub enum AlStatus {
     NoValidFirmware = 0x0014,
 
     /// Invalid mailbox configuration
+    ///
+    /// First value as defined in `ethercatprint.c`.
     InvalidMailboxConfig = 0x0015,
 
-    // NOTE:
-    // This variant is declared twice
-    // in `ethercatprint.c`
-    // InvalidMailboxConfig = 0x0016,
+    /// Invalid mailbox configuration
+    ///
+    /// Second value as defined in `ethercatprint.c`.
+    InvalidMailboxConfig2 = 0x0016,
+
     /// Invalid sync manager configuration
     InvalidSyncManagerConfiguration = 0x0017,
 
@@ -166,9 +173,6 @@ pub enum AlStatus {
 
 impl From<u16> for AlStatus {
     fn from(code: u16) -> Self {
-        match code {
-            0x0015 | 0x0016 => AlStatus::InvalidMailboxConfig,
-            _ => AlStatus::from_u16(code).unwrap_or(AlStatus::Unknown),
-        }
+        AlStatus::from_u16(code).unwrap_or(AlStatus::Unknown)
     }
 }
