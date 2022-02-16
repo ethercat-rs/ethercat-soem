@@ -1,20 +1,20 @@
+use std::{env, format, path::PathBuf};
+
+#[cfg(feature = "issue-224-workaround")]
 use std::{
-    env, format,
     io::{BufWriter, Write},
-    path::PathBuf,
+    path::Path,
     process::{Command, Stdio},
 };
 
-const ISSUE_224_PATCH: &[u8] = include_bytes!("issue-224.patch");
+#[cfg(feature = "issue-224-workaround")]
+const ISSUE_224_WORKAROUND_PATCH_DATA: &[u8] = include_bytes!("issue-224-workaround.patch");
 
 fn main() {
     let soem_dir = env::var("SOEM_PATH").unwrap_or("SOEM".to_string());
 
-    let issue_224_workaround = env::var("CARGO_FEATURE_ISSUE_224_WORKAROUND").is_ok();
-
-    if issue_224_workaround {
-        patch_files(&soem_dir);
-    }
+    #[cfg(feature = "issue-224-workaround")]
+    apply_patch(Path::new(&soem_dir), ISSUE_224_WORKAROUND_PATCH_DATA);
 
     let dst = cmake::Config::new(&soem_dir).build();
 
@@ -52,12 +52,12 @@ fn main() {
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
 
-    if issue_224_workaround {
-        undo_patch_files(&soem_dir);
-    }
+    #[cfg(feature = "issue-224-workaround")]
+    unapply_patch(Path::new(&soem_dir), ISSUE_224_WORKAROUND_PATCH_DATA);
 }
 
-fn patch_files(soem_dir: &str) {
+#[cfg(feature = "issue-224-workaround")]
+fn apply_patch(soem_dir: &Path, patch_data: &[u8]) {
     let mut patch_stdin = Command::new("patch")
         .arg("-p0")
         .stdin(Stdio::piped())
@@ -68,11 +68,12 @@ fn patch_files(soem_dir: &str) {
         .unwrap();
     let mut writer = BufWriter::new(&mut patch_stdin);
     writer
-        .write_all(ISSUE_224_PATCH)
+        .write_all(patch_data)
         .expect("Could not patch sources");
 }
 
-fn undo_patch_files(soem_dir: &str) {
+#[cfg(feature = "issue-224-workaround")]
+fn unapply_patch(soem_dir: &Path, patch_data: &[u8]) {
     let mut patch_stdin = Command::new("patch")
         .arg("-R")
         .arg("-p0")
@@ -84,6 +85,6 @@ fn undo_patch_files(soem_dir: &str) {
         .unwrap();
     let mut writer = BufWriter::new(&mut patch_stdin);
     writer
-        .write_all(ISSUE_224_PATCH)
+        .write_all(patch_data)
         .expect("Could not undo patching sources");
 }
