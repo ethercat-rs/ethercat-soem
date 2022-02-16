@@ -118,12 +118,14 @@ impl Master {
 
     #[doc(hidden)]
     /// Don't use this!
+    #[must_use]
     pub fn sdo_info_cache(&self) -> &[SdoInfo] {
         &self.sdos
     }
 
     #[doc(hidden)]
     /// Don't use this!
+    #[must_use]
     pub fn pdo_info_cache(&self) -> &[PdoInfo] {
         &self.pdos
     }
@@ -475,6 +477,7 @@ impl Master {
         Ok(found_state)
     }
 
+    #[must_use]
     pub fn slaves(&self) -> &[ctx::Slave] {
         let cnt = self.ctx.slave_count();
         &self.ctx.slaves()[1..=cnt]
@@ -541,14 +544,17 @@ impl Master {
         Ok(self.ctx.groups()[i].inputs_wkc() as usize)
     }
 
+    #[must_use]
     pub fn slave_count(&self) -> usize {
         self.ctx.slave_count() as usize
     }
 
+    #[must_use]
     pub fn max_group(&self) -> usize {
         self.ctx.max_group() as usize
     }
 
+    #[must_use]
     pub fn dc_time(&self) -> i64 {
         self.ctx.dc_time()
     }
@@ -808,6 +814,7 @@ impl Master {
         Ok(())
     }
 
+    #[must_use]
     pub fn pdo_values(&self) -> Vec<Vec<(ec::Idx, Vec<ec::Value>)>> {
         let mut all_pdos = vec![];
         for (i, slave) in self.slaves().iter().enumerate() {
