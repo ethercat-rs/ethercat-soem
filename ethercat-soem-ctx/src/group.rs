@@ -33,7 +33,7 @@ impl Group {
     //pub inputs: *mut uint8,
 
     // TODO:
-    // has DC capabillity
+    // has DC capability
     // pub hasdc: boolean,
 
     // TODO:
