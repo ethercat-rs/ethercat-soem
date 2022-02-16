@@ -9,18 +9,18 @@ edition = "2021"
 
 [dependencies]
 ethercat-types = "0.3.5"
-log = "0.4"
-num-derive = "0.3"
-num-traits = "0.2"
-thiserror = "1"
+log = "0.4.14"
+num-derive = "0.3.3"
+num-traits = "0.2.14"
+thiserror = "1.0.30"
 
 [dependencies.ethercat-soem-ctx]
 version = "0.1.1"
 path = "ethercat-soem-ctx"
 
 [dev-dependencies]
-anyhow = "1"
-env_logger = "0.8"
+anyhow = "1.0.53"
+env_logger = "0.9.0"
 
 [features]
 # See https://github.com/OpenEtherCATsociety/SOEM/issues/224#issuecomment-525872643
