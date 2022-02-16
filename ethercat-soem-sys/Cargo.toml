@@ -8,7 +8,7 @@ license = "GPL-2.0-only"
 edition = "2021"
 
 [build-dependencies]
-bindgen = "0.55"
+bindgen = "0.59"
 cmake = "0.1"
 
 [features]
